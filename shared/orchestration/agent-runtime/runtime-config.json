@@ -1,0 +1,41 @@
+{
+  "agent_defaults": {
+    "image": "dgmstt/agent:latest",
+    "cpuLimit": "0.5",
+    "memoryLimit": "512m",
+    "autoRestart": true,
+    "environment": {
+      "PYTHONUNBUFFERED": "1",
+      "LOG_LEVEL": "INFO"
+    },
+    "volumes": [
+      "${PWD}/shared/tools:/tools:ro",
+      "${PWD}/shared/protocols.py:/workspace/protocols.py:ro",
+      "${PWD}/workspace:/workspace/output"
+    ]
+  },
+  "resource_limits": {
+    "max_agents": 10,
+    "max_cpu_per_agent": "1.0",
+    "max_memory_per_agent": "1024m",
+    "max_disk_per_agent": "1g"
+  },
+  "health_check": {
+    "interval": 30,
+    "timeout": 3,
+    "retries": 3,
+    "start_period": 5
+  },
+  "security": {
+    "enable_seccomp": true,
+    "enable_apparmor": true,
+    "readonly_rootfs": false,
+    "no_new_privileges": true,
+    "drop_capabilities": ["ALL"]
+  },
+  "network": {
+    "name": "agent-network",
+    "driver": "bridge",
+    "enable_ipv6": false
+  }
+}

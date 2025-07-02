@@ -1,0 +1,150 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Docker: Start Development Environment",
+      "type": "shell",
+      "command": "docker-compose -f docker-compose.dev.yml up -d",
+      "problemMatcher": [],
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      },
+      "presentation": {
+        "reveal": "always",
+        "panel": "new"
+      }
+    },
+    {
+      "label": "Docker: Stop Development Environment",
+      "type": "shell",
+      "command": "docker-compose -f docker-compose.dev.yml down",
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "new"
+      }
+    },
+    {
+      "label": "Docker: Rebuild Services",
+      "type": "shell",
+      "command": "docker-compose -f docker-compose.dev.yml build --no-cache",
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "new"
+      }
+    },
+    {
+      "label": "OpenCode: Install Dependencies",
+      "type": "shell",
+      "command": "cd opencode && bun install",
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "new"
+      }
+    },
+    {
+      "label": "DGM: Install Dependencies",
+      "type": "shell",
+      "command": "cd dgm && pip install -r requirements.txt -r requirements_dev.txt",
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "new"
+      }
+    },
+    {
+      "label": "OpenCode: Run Tests",
+      "type": "shell",
+      "command": "cd opencode && bun test",
+      "problemMatcher": [],
+      "group": "test"
+    },
+    {
+      "label": "DGM: Run Tests",
+      "type": "shell",
+      "command": "cd dgm && python -m pytest -v",
+      "problemMatcher": [],
+      "group": "test"
+    },
+    {
+      "label": "OpenCode: Lint",
+      "type": "shell",
+      "command": "cd opencode && bun run lint",
+      "problemMatcher": ["$eslint-stylish"],
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      }
+    },
+    {
+      "label": "DGM: Lint",
+      "type": "shell",
+      "command": "cd dgm && flake8 . && mypy .",
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      }
+    },
+    {
+      "label": "Generate TypeScript Types from Python",
+      "type": "shell",
+      "command": "python protocol/python/translator.py --output protocol/typescript/src/generated",
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "new"
+      }
+    },
+    {
+      "label": "Docker: View Logs (All Services)",
+      "type": "shell",
+      "command": "docker-compose -f docker-compose.dev.yml logs -f",
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated"
+      }
+    },
+    {
+      "label": "Docker: View OpenCode Logs",
+      "type": "shell",
+      "command": "docker-compose -f docker-compose.dev.yml logs -f opencode",
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated"
+      }
+    },
+    {
+      "label": "Docker: View DGM Logs",
+      "type": "shell",
+      "command": "docker-compose -f docker-compose.dev.yml logs -f dgm",
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated"
+      }
+    },
+    {
+      "label": "Full Stack: Lint All",
+      "dependsOn": [
+        "OpenCode: Lint",
+        "DGM: Lint"
+      ],
+      "problemMatcher": []
+    },
+    {
+      "label": "Full Stack: Test All",
+      "dependsOn": [
+        "OpenCode: Run Tests",
+        "DGM: Run Tests"
+      ],
+      "group": "test",
+      "problemMatcher": []
+    }
+  ]
+}

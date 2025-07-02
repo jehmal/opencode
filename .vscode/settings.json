@@ -1,0 +1,126 @@
+{
+  // Editor settings
+  "editor.formatOnSave": true,
+  "editor.codeActionsOnSave": {
+    "source.fixAll": "explicit",
+    "source.organizeImports": "explicit"
+  },
+  "editor.rulers": [80, 120],
+  "editor.tabSize": 2,
+
+  // TypeScript/JavaScript settings
+  "typescript.tsdk": "opencode/node_modules/typescript/lib",
+  "typescript.enablePromptUseWorkspaceTsdk": true,
+  "[typescript]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode",
+    "editor.tabSize": 2
+  },
+  "[javascript]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode",
+    "editor.tabSize": 2
+  },
+
+  // Python settings
+  "python.defaultInterpreterPath": "${workspaceFolder}/dgm/.venv/bin/python",
+  "python.linting.enabled": true,
+  "python.linting.pylintEnabled": false,
+  "python.linting.flake8Enabled": true,
+  "python.linting.flake8Path": "${workspaceFolder}/dgm/.venv/bin/flake8",
+  "python.formatting.provider": "black",
+  "python.formatting.blackPath": "${workspaceFolder}/dgm/.venv/bin/black",
+  "python.testing.pytestEnabled": true,
+  "python.testing.pytestPath": "${workspaceFolder}/dgm/.venv/bin/pytest",
+  "[python]": {
+    "editor.defaultFormatter": "ms-python.black-formatter",
+    "editor.tabSize": 4
+  },
+
+  // Docker settings
+  "docker.defaultRegistryPath": "opencode-dgm",
+  "docker.containers.label": "com.docker.compose.project",
+  "docker.containers.sortBy": "Label",
+
+  // File associations
+  "files.associations": {
+    "*.json": "jsonc",
+    "Dockerfile*": "dockerfile",
+    "docker-compose*.yml": "dockercompose",
+    "*.env*": "dotenv"
+  },
+
+  // Search exclusions
+  "search.exclude": {
+    "**/node_modules": true,
+    "**/.next": true,
+    "**/dist": true,
+    "**/.venv": true,
+    "**/__pycache__": true,
+    "**/*.pyc": true,
+    "**/dgm-cache": true,
+    "**/logs": true,
+    "**/.coverage": true,
+    "**/htmlcov": true
+  },
+
+  // File watcher exclusions
+  "files.watcherExclude": {
+    "**/.git/objects/**": true,
+    "**/.git/subtree-cache/**": true,
+    "**/node_modules/**": true,
+    "**/.next/**": true,
+    "**/dist/**": true,
+    "**/.venv/**": true,
+    "**/__pycache__/**": true,
+    "**/dgm-cache/**": true
+  },
+
+  // Terminal settings
+  "terminal.integrated.env.linux": {
+    "PYTHONPATH": "${workspaceFolder}/dgm:${workspaceFolder}/shared/python"
+  },
+  "terminal.integrated.env.windows": {
+    "PYTHONPATH": "${workspaceFolder}\\dgm;${workspaceFolder}\\shared\\python"
+  },
+
+  // Git settings
+  "git.ignoreLimitWarning": true,
+
+  // Extension recommendations
+  "extensions.ignoreRecommendations": false,
+
+  // Task settings
+  "task.autoDetect": "on",
+
+  // Prettier settings
+  "prettier.requireConfig": true,
+  "prettier.ignorePath": ".prettierignore",
+
+  // ESLint settings
+  "eslint.workingDirectories": [
+    "./opencode",
+    "./packages/*"
+  ],
+  "eslint.validate": [
+    "javascript",
+    "javascriptreact",
+    "typescript",
+    "typescriptreact"
+  ],
+
+  // Python specific
+  "python.analysis.typeCheckingMode": "strict",
+  "python.analysis.autoImportCompletions": true,
+  "python.analysis.diagnosticMode": "workspace",
+
+  // Remote development
+  "remote.containers.defaultExtensions": [
+    "ms-python.python",
+    "ms-python.vscode-pylance",
+    "ms-python.black-formatter",
+    "dbaeumer.vscode-eslint",
+    "esbenp.prettier-vscode",
+    "ms-azuretools.vscode-docker",
+    "eamodio.gitlens",
+    "streetsidesoftware.code-spell-checker"
+  ]
+}

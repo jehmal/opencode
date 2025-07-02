@@ -1,0 +1,31 @@
+# Bun configuration for monorepo
+[install]
+# Use hardlinks for faster installs
+auto = "fallback"
+
+# Lifecycle scripts configuration
+[install.lifecycle]
+preinstall = true
+postinstall = true
+
+# Package resolution
+[install.resolution]
+# Prefer workspace packages
+preferWorkspace = true
+
+# Registry configuration
+[install.registry]
+default = "https://registry.npmjs.org"
+
+# Cache configuration
+[install.cache]
+dir = "~/.bun/install/cache"
+
+# Lockfile configuration
+[install.lockfile]
+save = true
+
+# Dev configuration
+[dev]
+# Port range for development servers
+portRange = [3000, 4000]

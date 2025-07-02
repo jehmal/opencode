@@ -1,0 +1,27 @@
+# Agent runtime specific dependencies
+psutil>=5.9.0
+memory-profiler>=0.60.0
+py-spy>=0.3.14
+fastapi>=0.104.0
+uvicorn[standard]>=0.24.0
+pydantic>=2.0.0
+httpx>=0.25.0
+aiofiles>=23.2.1
+asyncio>=3.4.3
+
+# Security and isolation
+pyarmor>=8.0.0
+restrictedpython>=6.0
+
+# Monitoring and metrics
+prometheus-client>=0.18.0
+structlog>=23.2.0
+
+# Communication with host
+websockets>=12.0
+aioredis>=2.0.0
+kombu>=5.3.0
+
+# Resource management
+resource>=0.2.1
+setproctitle>=1.3.3

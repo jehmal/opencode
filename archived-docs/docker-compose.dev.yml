@@ -1,0 +1,175 @@
+version: '3.8'
+
+services:
+  # OpenCode TypeScript Service with Hot Reloading
+  opencode:
+    build:
+      context: ./opencode
+      dockerfile: Dockerfile.dev
+      args:
+        - NODE_ENV=development
+    ports:
+      - "3000:3000"
+      - "9229:9229"  # Node.js debugging port
+    environment:
+      - NODE_ENV=development
+      - PORT=3000
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - DGM_API_URL=http://dgm:8000
+      - DEBUG=opencode:*
+      - WATCHPACK_POLLING=true  # Enable polling for file changes in containers
+    volumes:
+      - ./opencode:/app
+      - /app/node_modules
+      - /app/.next
+      - ./shared:/app/shared:ro
+    command: bun run dev
+    stdin_open: true
+    tty: true
+    depends_on:
+      - redis
+      - dgm
+    networks:
+      - opencode-dgm
+
+  # DGM Python Service with Hot Reloading
+  dgm:
+    build:
+      context: ./dgm
+      dockerfile: Dockerfile.dev
+      args:
+        - ENVIRONMENT=development
+    ports:
+      - "8000:8000"
+      - "5678:5678"  # Python debugging port (debugpy)
+    environment:
+      - PYTHONUNBUFFERED=1
+      - PYTHONDONTWRITEBYTECODE=1
+      - ENVIRONMENT=development
+      - PORT=8000
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - REDIS_URL=redis://redis:6379
+      - OPENCODE_API_URL=http://opencode:3000
+      - DEBUG=1
+      - PYTHONPATH=/app
+      - WATCHDOG_ENABLE=true
+    volumes:
+      - ./dgm:/app
+      - dgm-cache:/app/.cache
+      - ./shared:/app/shared:ro
+      - ~/.gitconfig:/root/.gitconfig:ro
+      - ~/.ssh:/root/.ssh:ro
+    command: python -m debugpy --listen 0.0.0.0:5678 --wait-for-client -m uvicorn main:app --host 0.0.0.0 --port 8000 --reload --reload-dir /app
+    stdin_open: true
+    tty: true
+    depends_on:
+      - redis
+    networks:
+      - opencode-dgm
+
+  # Redis with persistence and monitoring
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+      - ./redis.conf:/usr/local/etc/redis/redis.conf:ro
+    command: redis-server /usr/local/etc/redis/redis.conf
+    networks:
+      - opencode-dgm
+
+  # PostgreSQL with initialization scripts
+  postgres:
+    image: postgres:15-alpine
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_USER=opencode_dgm
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-postgres}
+      - POSTGRES_DB=opencode_dgm
+      - POSTGRES_INITDB_ARGS=--encoding=UTF8
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./db/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U opencode_dgm"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - opencode-dgm
+
+  # Nginx with hot reload for config changes
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.dev.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/conf.d:/etc/nginx/conf.d:ro
+      - ./certs:/etc/nginx/certs:ro
+      - ./logs/nginx:/var/log/nginx
+    command: [nginx-debug, '-g', 'daemon off;']
+    depends_on:
+      - opencode
+      - dgm
+    networks:
+      - opencode-dgm
+
+  # Development tools
+  adminer:
+    image: adminer
+    ports:
+      - "8080:8080"
+    environment:
+      - ADMINER_DEFAULT_SERVER=postgres
+      - ADMINER_DESIGN=pepa-linha-dark
+    networks:
+      - opencode-dgm
+
+  redis-commander:
+    image: rediscommander/redis-commander
+    ports:
+      - "8081:8081"
+    environment:
+      - REDIS_HOSTS=local:redis:6379
+      - HTTP_USER=admin
+      - HTTP_PASSWORD=${REDIS_COMMANDER_PASSWORD:-admin}
+    networks:
+      - opencode-dgm
+
+  # Mailhog for email testing
+  mailhog:
+    image: mailhog/mailhog
+    ports:
+      - "1025:1025"  # SMTP server
+      - "8025:8025"  # Web UI
+    networks:
+      - opencode-dgm
+
+  # Portainer for container management
+  portainer:
+    image: portainer/portainer-ce:latest
+    ports:
+      - "9000:9000"
+      - "9443:9443"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - portainer-data:/data
+    restart: unless-stopped
+    networks:
+      - opencode-dgm
+
+volumes:
+  redis-data:
+  postgres-data:
+  dgm-cache:
+  portainer-data:
+
+networks:
+  opencode-dgm:
+    driver: bridge

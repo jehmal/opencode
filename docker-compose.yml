@@ -1,0 +1,118 @@
+version: '3.8'
+
+services:
+  # OpenCode TypeScript Service
+  opencode:
+    build:
+      context: ./opencode
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=development
+      - PORT=3000
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - DGM_API_URL=http://dgm:8000
+    volumes:
+      - ./opencode:/app
+      - /app/node_modules
+    depends_on:
+      - redis
+      - dgm
+    networks:
+      - opencode-dgm
+
+  # DGM Python Service
+  dgm:
+    build:
+      context: ./dgm
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      - PYTHONUNBUFFERED=1
+      - ENVIRONMENT=development
+      - PORT=8000
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - REDIS_URL=redis://redis:6379
+      - OPENCODE_API_URL=http://opencode:3000
+    volumes:
+      - ./dgm:/app
+      - dgm-cache:/app/.cache
+    depends_on:
+      - redis
+    networks:
+      - opencode-dgm
+
+  # Redis for caching and queuing
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    networks:
+      - opencode-dgm
+
+  # PostgreSQL for persistent storage
+  postgres:
+    image: postgres:15-alpine
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_USER=opencode_dgm
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-postgres}
+      - POSTGRES_DB=opencode_dgm
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    networks:
+      - opencode-dgm
+
+  # Nginx reverse proxy
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./certs:/etc/nginx/certs:ro
+    depends_on:
+      - opencode
+      - dgm
+    networks:
+      - opencode-dgm
+
+  # Development tools
+  adminer:
+    image: adminer
+    ports:
+      - "8080:8080"
+    environment:
+      - ADMINER_DEFAULT_SERVER=postgres
+    networks:
+      - opencode-dgm
+    profiles:
+      - dev
+
+  redis-commander:
+    image: rediscommander/redis-commander
+    ports:
+      - "8081:8081"
+    environment:
+      - REDIS_HOSTS=local:redis:6379
+    networks:
+      - opencode-dgm
+    profiles:
+      - dev
+
+volumes:
+  redis-data:
+  postgres-data:
+  dgm-cache:
+
+networks:
+  opencode-dgm:
+    driver: bridge

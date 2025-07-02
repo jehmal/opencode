@@ -1,0 +1,85 @@
+# Base image for DGM Python agents
+FROM python:3.10-slim AS agent-base
+
+# Security: Run as non-root user
+RUN groupadd -r agent && useradd -r -g agent agent
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    git \
+    curl \
+    libssl-dev \
+    libffi-dev \
+    python3-dev \
+    # Security tools
+    dumb-init \
+    gosu \
+    # Resource monitoring
+    htop \
+    procps \
+    # Clean up
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
+# Set working directory
+WORKDIR /app
+
+# Copy requirements and install Python dependencies
+COPY requirements.txt requirements-agent.txt ./
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir -r requirements.txt && \
+    pip install --no-cache-dir -r requirements-agent.txt
+
+# Create necessary directories
+RUN mkdir -p /app/workspace /app/logs /app/cache /app/results && \
+    chown -R agent:agent /app
+
+# Copy agent wrapper and utilities
+COPY agent-runtime/scripts/agent-wrapper.py /app/
+COPY shared /app/shared
+COPY tools /app/tools
+COPY utils /app/utils
+
+# Set Python path
+ENV PYTHONPATH=/app:/app/shared
+
+# Security: Set resource limits
+ENV AGENT_MAX_MEMORY=2G
+ENV AGENT_MAX_CPU=2.0
+ENV AGENT_TIMEOUT=600
+
+# Use dumb-init to handle signals properly
+ENTRYPOINT ["dumb-init", "--"]
+
+# Default command (will be overridden)
+CMD ["python", "/app/agent-wrapper.py"]
+
+# Runtime stage for specific agent types
+FROM agent-base AS coding-agent
+
+# Copy DGM coding agent
+COPY coding_agent.py /app/
+COPY llm.py llm_withtools.py /app/
+COPY prompts /app/prompts
+
+# Set default agent type
+ENV AGENT_TYPE=coding
+
+# Test/Debug stage
+FROM agent-base AS debug-agent
+
+# Install debugging tools
+RUN pip install --no-cache-dir \
+    debugpy \
+    ipython \
+    ipdb \
+    pytest \
+    pytest-asyncio \
+    pytest-timeout
+
+# Expose debugging port
+EXPOSE 5678
+
+# Override entrypoint for debugging
+ENTRYPOINT ["dumb-init", "--", "python", "-m", "debugpy", "--listen", "0.0.0.0:5678", "--wait-for-client"]

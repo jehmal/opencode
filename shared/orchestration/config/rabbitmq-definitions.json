@@ -1,0 +1,344 @@
+{
+  "rabbit_version": "3.12",
+  "rabbitmq_version": "3.12",
+  "product_name": "RabbitMQ",
+  "product_version": "3.12",
+  "users": [
+    {
+      "name": "dgmstt_user",
+      "password_hash": "WILL_BE_REPLACED_BY_ENV",
+      "hashing_algorithm": "rabbit_password_hashing_sha256",
+      "tags": ["administrator"]
+    }
+  ],
+  "vhosts": [
+    {
+      "name": "dgmstt"
+    }
+  ],
+  "permissions": [
+    {
+      "user": "dgmstt_user",
+      "vhost": "dgmstt",
+      "configure": ".*",
+      "write": ".*",
+      "read": ".*"
+    }
+  ],
+  "exchanges": [
+    {
+      "name": "dgmstt.orchestrator",
+      "vhost": "dgmstt",
+      "type": "topic",
+      "durable": true,
+      "auto_delete": false,
+      "internal": false,
+      "arguments": {}
+    },
+    {
+      "name": "dgmstt.agents",
+      "vhost": "dgmstt",
+      "type": "direct",
+      "durable": true,
+      "auto_delete": false,
+      "internal": false,
+      "arguments": {}
+    },
+    {
+      "name": "dgmstt.events",
+      "vhost": "dgmstt",
+      "type": "fanout",
+      "durable": true,
+      "auto_delete": false,
+      "internal": false,
+      "arguments": {}
+    },
+    {
+      "name": "dgmstt.dlx",
+      "vhost": "dgmstt",
+      "type": "topic",
+      "durable": true,
+      "auto_delete": false,
+      "internal": false,
+      "arguments": {}
+    },
+    {
+      "name": "dgmstt.evolution",
+      "vhost": "dgmstt",
+      "type": "topic",
+      "durable": true,
+      "auto_delete": false,
+      "internal": false,
+      "arguments": {}
+    }
+  ],
+  "queues": [
+    {
+      "name": "orchestrator.tasks",
+      "vhost": "dgmstt",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-message-ttl": 3600000,
+        "x-max-priority": 10,
+        "x-dead-letter-exchange": "dgmstt.dlx",
+        "x-dead-letter-routing-key": "dlq.orchestrator.tasks"
+      }
+    },
+    {
+      "name": "orchestrator.results",
+      "vhost": "dgmstt",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-message-ttl": 3600000
+      }
+    },
+    {
+      "name": "agent.commands",
+      "vhost": "dgmstt",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-message-ttl": 1800000,
+        "x-max-priority": 10,
+        "x-dead-letter-exchange": "dgmstt.dlx",
+        "x-dead-letter-routing-key": "dlq.agent.commands"
+      }
+    },
+    {
+      "name": "agent.heartbeats",
+      "vhost": "dgmstt",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-message-ttl": 60000,
+        "x-max-length": 10000
+      }
+    },
+    {
+      "name": "events.broadcast",
+      "vhost": "dgmstt",
+      "durable": false,
+      "auto_delete": false,
+      "arguments": {
+        "x-message-ttl": 300000
+      }
+    },
+    {
+      "name": "dlq.orchestrator.tasks",
+      "vhost": "dgmstt",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-message-ttl": 86400000
+      }
+    },
+    {
+      "name": "dlq.agent.commands",
+      "vhost": "dgmstt",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-message-ttl": 86400000
+      }
+    },
+    {
+      "name": "evolution.generation",
+      "vhost": "dgmstt",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-message-ttl": 7200000,
+        "x-max-priority": 5,
+        "x-dead-letter-exchange": "dgmstt.dlx",
+        "x-dead-letter-routing-key": "dlq.evolution.generation"
+      }
+    },
+    {
+      "name": "evolution.agents",
+      "vhost": "dgmstt",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-message-ttl": 3600000,
+        "x-max-length": 50000
+      }
+    },
+    {
+      "name": "evolution.mutations",
+      "vhost": "dgmstt",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-message-ttl": 3600000
+      }
+    },
+    {
+      "name": "evolution.selection",
+      "vhost": "dgmstt",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-message-ttl": 3600000
+      }
+    },
+    {
+      "name": "evolution.archive",
+      "vhost": "dgmstt",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-message-ttl": 86400000,
+        "x-max-length": 10000
+      }
+    },
+    {
+      "name": "evolution.metrics",
+      "vhost": "dgmstt",
+      "durable": false,
+      "auto_delete": false,
+      "arguments": {
+        "x-message-ttl": 600000,
+        "x-max-length": 1000
+      }
+    },
+    {
+      "name": "dlq.evolution.generation",
+      "vhost": "dgmstt",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-message-ttl": 86400000
+      }
+    }
+  ],
+  "bindings": [
+    {
+      "source": "dgmstt.orchestrator",
+      "vhost": "dgmstt",
+      "destination": "orchestrator.tasks",
+      "destination_type": "queue",
+      "routing_key": "task.*",
+      "arguments": {}
+    },
+    {
+      "source": "dgmstt.orchestrator",
+      "vhost": "dgmstt",
+      "destination": "orchestrator.results",
+      "destination_type": "queue",
+      "routing_key": "result.*",
+      "arguments": {}
+    },
+    {
+      "source": "dgmstt.agents",
+      "vhost": "dgmstt",
+      "destination": "agent.commands",
+      "destination_type": "queue",
+      "routing_key": "command",
+      "arguments": {}
+    },
+    {
+      "source": "dgmstt.agents",
+      "vhost": "dgmstt",
+      "destination": "agent.heartbeats",
+      "destination_type": "queue",
+      "routing_key": "heartbeat",
+      "arguments": {}
+    },
+    {
+      "source": "dgmstt.events",
+      "vhost": "dgmstt",
+      "destination": "events.broadcast",
+      "destination_type": "queue",
+      "routing_key": "",
+      "arguments": {}
+    },
+    {
+      "source": "dgmstt.dlx",
+      "vhost": "dgmstt",
+      "destination": "dlq.orchestrator.tasks",
+      "destination_type": "queue",
+      "routing_key": "dlq.orchestrator.tasks",
+      "arguments": {}
+    },
+    {
+      "source": "dgmstt.dlx",
+      "vhost": "dgmstt",
+      "destination": "dlq.agent.commands",
+      "destination_type": "queue",
+      "routing_key": "dlq.agent.commands",
+      "arguments": {}
+    },
+    {
+      "source": "dgmstt.evolution",
+      "vhost": "dgmstt",
+      "destination": "evolution.generation",
+      "destination_type": "queue",
+      "routing_key": "evolution.generation.*",
+      "arguments": {}
+    },
+    {
+      "source": "dgmstt.evolution",
+      "vhost": "dgmstt",
+      "destination": "evolution.agents",
+      "destination_type": "queue",
+      "routing_key": "evolution.agent.*",
+      "arguments": {}
+    },
+    {
+      "source": "dgmstt.evolution",
+      "vhost": "dgmstt",
+      "destination": "evolution.mutations",
+      "destination_type": "queue",
+      "routing_key": "evolution.mutation.*",
+      "arguments": {}
+    },
+    {
+      "source": "dgmstt.evolution",
+      "vhost": "dgmstt",
+      "destination": "evolution.selection",
+      "destination_type": "queue",
+      "routing_key": "evolution.selection.*",
+      "arguments": {}
+    },
+    {
+      "source": "dgmstt.evolution",
+      "vhost": "dgmstt",
+      "destination": "evolution.archive",
+      "destination_type": "queue",
+      "routing_key": "evolution.archive.*",
+      "arguments": {}
+    },
+    {
+      "source": "dgmstt.evolution",
+      "vhost": "dgmstt",
+      "destination": "evolution.metrics",
+      "destination_type": "queue",
+      "routing_key": "evolution.#",
+      "arguments": {}
+    },
+    {
+      "source": "dgmstt.dlx",
+      "vhost": "dgmstt",
+      "destination": "dlq.evolution.generation",
+      "destination_type": "queue",
+      "routing_key": "dlq.evolution.generation",
+      "arguments": {}
+    }
+  ],
+  "policies": [
+    {
+      "vhost": "dgmstt",
+      "name": "ha-agents",
+      "pattern": "^agent\\.",
+      "apply-to": "queues",
+      "definition": {
+        "ha-mode": "exactly",
+        "ha-params": 2,
+        "ha-sync-mode": "automatic"
+      },
+      "priority": 1
+    }
+  ]
+}

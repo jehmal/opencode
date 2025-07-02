@@ -1,0 +1,131 @@
+# Multi-stage Dockerfile for DGM Agent Runtime
+# Stage 1: Build environment
+FROM python:3.10-slim as builder
+
+# Install build dependencies
+RUN apt-get update && apt-get install -y \
+    gcc \
+    g++ \
+    git \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Set working directory
+WORKDIR /build
+
+# Copy requirements
+COPY shared/orchestration/agent-runtime/requirements.agent.txt /build/requirements.txt
+COPY dgm/pyproject.toml /build/pyproject.toml
+COPY dgm/poetry.lock* /build/
+
+# Install poetry
+RUN pip install poetry==1.7.1
+
+# Create virtual environment and install dependencies
+RUN python -m venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
+
+# Install agent requirements
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Install DGM dependencies if poetry.lock exists
+RUN if [ -f poetry.lock ]; then \
+        poetry config virtualenvs.create false && \
+        poetry install --no-interaction --no-ansi --no-root; \
+    fi
+
+# Stage 2: Runtime environment
+FROM python:3.10-slim
+
+# Install runtime dependencies
+RUN apt-get update && apt-get install -y \
+    git \
+    curl \
+    jq \
+    htop \
+    procps \
+    net-tools \
+    dumb-init \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create non-root user for security
+RUN useradd -m -u 1000 -s /bin/bash dgmagent && \
+    mkdir -p /home/dgmagent/.ssh && \
+    chown -R dgmagent:dgmagent /home/dgmagent
+
+# Copy virtual environment from builder
+COPY --from=builder /opt/venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
+
+# Set working directory
+WORKDIR /app
+
+# Copy DGM modules
+COPY dgm/ /app/dgm/
+COPY shared/ /app/shared/
+
+# Copy agent runtime files
+COPY shared/orchestration/agent-runtime/agent_wrapper.py /app/
+COPY shared/orchestration/agent-runtime/python_adapter.py /app/
+COPY shared/orchestration/agent-runtime/type_converter.py /app/
+COPY shared/orchestration/orchestrator/orchestrator_client.py /app/
+
+# Set Python path
+ENV PYTHONPATH="/app:/app/dgm:$PYTHONPATH"
+ENV PYTHONUNBUFFERED=1
+
+# Create directories for agent data
+RUN mkdir -p /app/workspace /app/logs /app/metrics && \
+    chown -R dgmagent:dgmagent /app
+
+# Security: Drop capabilities
+RUN apt-get update && apt-get install -y libcap2-bin && \
+    rm -rf /var/lib/apt/lists/*
+
+# Health check script
+COPY --chown=dgmagent:dgmagent <<'EOF' /app/health_check.py
+#!/usr/bin/env python3
+import sys
+import requests
+import os
+
+port = os.getenv('AGENT_PORT', '8000')
+try:
+    response = requests.get(f'http://localhost:{port}/health', timeout=5)
+    if response.status_code == 200:
+        print("Agent is healthy")
+        sys.exit(0)
+    else:
+        print(f"Agent unhealthy: status {response.status_code}")
+        sys.exit(1)
+except Exception as e:
+    print(f"Agent health check failed: {e}")
+    sys.exit(1)
+EOF
+
+RUN chmod +x /app/health_check.py
+
+# Expose agent API port
+EXPOSE 8000
+
+# Set resource limits via Docker (not in Dockerfile)
+# These will be set in docker-compose or runtime config
+
+# Switch to non-root user
+USER dgmagent
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
+    CMD ["/opt/venv/bin/python", "/app/health_check.py"]
+
+# Use dumb-init to handle signals properly
+ENTRYPOINT ["/usr/bin/dumb-init", "--"]
+
+# Default command runs the agent wrapper
+CMD ["/opt/venv/bin/python", "-u", "/app/agent_wrapper.py"]
+
+# Labels for metadata
+LABEL maintainer="DGMSTT Team" \
+      version="1.0.0" \
+      description="DGM Agent Runtime Container" \
+      org.opencontainers.image.source="https://github.com/dgmstt/agents"

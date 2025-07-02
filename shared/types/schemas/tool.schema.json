@@ -1,0 +1,241 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://opencode-dgm.com/schemas/tool.schema.json",
+  "title": "Tool Schema",
+  "description": "Schema definitions for tool-related types",
+  "definitions": {
+    "Tool": {
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "description": { "type": "string" },
+        "version": { "type": "string" },
+        "category": { "$ref": "#/definitions/ToolCategory" },
+        "language": { "$ref": "#/definitions/Language" },
+        "inputSchema": { "$ref": "#/definitions/JSONSchema" },
+        "outputSchema": { "$ref": "#/definitions/JSONSchema" },
+        "configuration": { "$ref": "#/definitions/ToolConfiguration" },
+        "examples": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/ToolExample" }
+        },
+        "metadata": { "$ref": "#/definitions/Metadata" }
+      },
+      "required": ["id", "name", "description", "version", "category", "language", "inputSchema"]
+    },
+    "ToolCategory": {
+      "type": "string",
+      "enum": [
+        "file-system",
+        "network",
+        "database",
+        "computation",
+        "text-processing",
+        "code-generation",
+        "testing",
+        "deployment",
+        "monitoring",
+        "security",
+        "ai-ml",
+        "data-processing",
+        "communication",
+        "utility"
+      ]
+    },
+    "Language": {
+      "type": "string",
+      "enum": ["typescript", "python", "javascript", "go", "rust", "java"]
+    },
+    "ToolConfiguration": {
+      "type": "object",
+      "properties": {
+        "timeout": { "type": "integer", "minimum": 0 },
+        "retryable": { "type": "boolean" },
+        "cacheable": { "type": "boolean" },
+        "rateLimit": { "$ref": "#/definitions/RateLimit" },
+        "authentication": { "$ref": "#/definitions/AuthConfiguration" },
+        "environment": {
+          "type": "object",
+          "additionalProperties": { "type": "string" }
+        },
+        "dependencies": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/ToolDependency" }
+        }
+      }
+    },
+    "RateLimit": {
+      "type": "object",
+      "properties": {
+        "requests": { "type": "integer", "minimum": 1 },
+        "window": { "type": "integer", "minimum": 1 },
+        "strategy": {
+          "type": "string",
+          "enum": ["fixed-window", "sliding-window", "token-bucket"]
+        }
+      },
+      "required": ["requests", "window", "strategy"]
+    },
+    "AuthConfiguration": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["none", "api-key", "oauth2", "basic", "jwt"]
+        },
+        "credentials": {},
+        "scope": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      },
+      "required": ["type"]
+    },
+    "ToolDependency": {
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "version": { "type": "string" },
+        "type": {
+          "type": "string",
+          "enum": ["tool", "library", "service", "resource"]
+        },
+        "optional": { "type": "boolean" }
+      },
+      "required": ["name", "type"]
+    },
+    "ToolExample": {
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "description": { "type": "string" },
+        "input": {},
+        "output": {},
+        "explanation": { "type": "string" }
+      },
+      "required": ["name", "input", "output"]
+    },
+    "ToolExecutionRequest": {
+      "type": "object",
+      "properties": {
+        "toolId": { "type": "string" },
+        "input": {},
+        "context": {
+          "type": "object",
+          "additionalProperties": true
+        },
+        "options": { "$ref": "#/definitions/ToolExecutionOptions" }
+      },
+      "required": ["toolId", "input"]
+    },
+    "ToolExecutionOptions": {
+      "type": "object",
+      "properties": {
+        "async": { "type": "boolean" },
+        "stream": { "type": "boolean" },
+        "cache": { "type": "boolean" },
+        "priority": { "type": "integer", "minimum": 0 },
+        "timeout": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "ToolExecutionResult": {
+      "type": "object",
+      "properties": {
+        "toolId": { "type": "string" },
+        "executionId": { "type": "string" },
+        "status": {
+          "type": "string",
+          "enum": ["success", "error", "timeout", "cancelled"]
+        },
+        "output": {},
+        "error": { "$ref": "#/definitions/ToolError" },
+        "performance": { "$ref": "#/definitions/ToolPerformance" },
+        "artifacts": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/ToolArtifact" }
+        },
+        "logs": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/ToolLog" }
+        }
+      },
+      "required": ["toolId", "executionId", "status", "performance"]
+    },
+    "ToolError": {
+      "type": "object",
+      "properties": {
+        "code": { "type": "string" },
+        "message": { "type": "string" },
+        "details": {},
+        "retryable": { "type": "boolean" },
+        "cause": { "type": "string" }
+      },
+      "required": ["code", "message", "retryable"]
+    },
+    "ToolPerformance": {
+      "type": "object",
+      "properties": {
+        "startTime": { "type": "string", "format": "date-time" },
+        "endTime": { "type": "string", "format": "date-time" },
+        "duration": { "type": "integer", "minimum": 0 },
+        "memory": {
+          "type": "object",
+          "properties": {
+            "used": { "type": "integer", "minimum": 0 },
+            "peak": { "type": "integer", "minimum": 0 }
+          },
+          "required": ["used", "peak"]
+        },
+        "cpu": {
+          "type": "object",
+          "properties": {
+            "user": { "type": "number", "minimum": 0 },
+            "system": { "type": "number", "minimum": 0 }
+          },
+          "required": ["user", "system"]
+        },
+        "io": {
+          "type": "object",
+          "properties": {
+            "bytesRead": { "type": "integer", "minimum": 0 },
+            "bytesWritten": { "type": "integer", "minimum": 0 }
+          },
+          "required": ["bytesRead", "bytesWritten"]
+        }
+      },
+      "required": ["startTime", "endTime", "duration"]
+    },
+    "ToolArtifact": {
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "type": { "type": "string" },
+        "size": { "type": "integer", "minimum": 0 },
+        "content": {},
+        "encoding": { "type": "string" },
+        "checksum": { "type": "string" }
+      },
+      "required": ["name", "type"]
+    },
+    "ToolLog": {
+      "type": "object",
+      "properties": {
+        "timestamp": { "type": "string", "format": "date-time" },
+        "level": {
+          "type": "string",
+          "enum": ["trace", "debug", "info", "warn", "error"]
+        },
+        "message": { "type": "string" },
+        "data": {}
+      },
+      "required": ["timestamp", "level", "message"]
+    },
+    "JSONSchema": {
+      "$ref": "agent.schema.json#/definitions/JSONSchema"
+    },
+    "Metadata": {
+      "$ref": "agent.schema.json#/definitions/Metadata"
+    }
+  }
+}

@@ -1,0 +1,355 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://opencode-dgm.com/schemas/agent.schema.json",
+  "title": "Agent Schema",
+  "description": "Schema definitions for agent-related types",
+  "definitions": {
+    "AgentCapability": {
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "description": { "type": "string" },
+        "category": {
+          "type": "string",
+          "enum": ["reasoning", "generation", "analysis", "transformation", "io", "coordination"]
+        },
+        "requiredTools": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "requiredAgents": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "inputSchema": { "$ref": "#/definitions/JSONSchema" },
+        "outputSchema": { "$ref": "#/definitions/JSONSchema" }
+      },
+      "required": ["id", "name", "description", "category"]
+    },
+    "AgentRole": {
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "description": { "type": "string" },
+        "capabilities": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "constraints": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "expertise": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "promptingTechnique": { "type": "string" }
+      },
+      "required": ["id", "name", "description", "capabilities"]
+    },
+    "Agent": {
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "description": { "type": "string" },
+        "version": { "type": "string" },
+        "role": { "$ref": "#/definitions/AgentRole" },
+        "capabilities": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/AgentCapability" }
+        },
+        "tools": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "subAgents": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "configuration": { "$ref": "#/definitions/AgentConfiguration" },
+        "metadata": { "$ref": "#/definitions/Metadata" }
+      },
+      "required": ["id", "name", "description", "version", "role", "capabilities", "tools"]
+    },
+    "AgentConfiguration": {
+      "type": "object",
+      "properties": {
+        "maxConcurrentTasks": { "type": "integer", "minimum": 1 },
+        "timeout": { "type": "integer", "minimum": 0 },
+        "retryPolicy": { "$ref": "#/definitions/RetryPolicy" },
+        "memory": { "$ref": "#/definitions/MemoryConfiguration" },
+        "communication": { "$ref": "#/definitions/CommunicationConfiguration" },
+        "promptTemplate": { "type": "string" },
+        "modelPreferences": { "$ref": "#/definitions/ModelPreferences" }
+      }
+    },
+    "RetryPolicy": {
+      "type": "object",
+      "properties": {
+        "maxAttempts": { "type": "integer", "minimum": 1 },
+        "backoffMs": { "type": "integer", "minimum": 0 },
+        "exponentialBackoff": { "type": "boolean" },
+        "retryableErrors": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      },
+      "required": ["maxAttempts", "backoffMs"]
+    },
+    "MemoryConfiguration": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["short-term", "long-term", "working", "episodic"]
+        },
+        "maxItems": { "type": "integer", "minimum": 1 },
+        "ttl": { "type": "integer", "minimum": 0 },
+        "persistToDisk": { "type": "boolean" },
+        "vectorStore": {
+          "type": "object",
+          "properties": {
+            "provider": { "type": "string" },
+            "dimensions": { "type": "integer", "minimum": 1 },
+            "similarityThreshold": { "type": "number", "minimum": 0, "maximum": 1 }
+          },
+          "required": ["provider", "dimensions", "similarityThreshold"]
+        }
+      },
+      "required": ["type"]
+    },
+    "CommunicationConfiguration": {
+      "type": "object",
+      "properties": {
+        "protocol": {
+          "type": "string",
+          "enum": ["json-rpc", "grpc", "http", "websocket"]
+        },
+        "format": {
+          "type": "string",
+          "enum": ["json", "protobuf", "msgpack"]
+        },
+        "compression": { "type": "boolean" },
+        "encryption": { "type": "boolean" }
+      },
+      "required": ["protocol", "format"]
+    },
+    "ModelPreferences": {
+      "type": "object",
+      "properties": {
+        "preferredModels": {
+          "type": "array",
+          "items": { "type": "string" },
+          "minItems": 1
+        },
+        "fallbackModels": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "temperature": { "type": "number", "minimum": 0, "maximum": 2 },
+        "maxTokens": { "type": "integer", "minimum": 1 },
+        "topP": { "type": "number", "minimum": 0, "maximum": 1 },
+        "frequencyPenalty": { "type": "number", "minimum": -2, "maximum": 2 },
+        "presencePenalty": { "type": "number", "minimum": -2, "maximum": 2 }
+      },
+      "required": ["preferredModels"]
+    },
+    "AgentTask": {
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "agentId": { "type": "string" },
+        "type": { "type": "string" },
+        "priority": { "$ref": "#/definitions/Priority" },
+        "input": {},
+        "constraints": { "$ref": "#/definitions/TaskConstraints" },
+        "dependencies": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "status": { "$ref": "#/definitions/Status" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "startedAt": { "type": "string", "format": "date-time" },
+        "completedAt": { "type": "string", "format": "date-time" },
+        "result": { "$ref": "#/definitions/TaskResult" }
+      },
+      "required": ["id", "agentId", "type", "priority", "input", "status", "createdAt"]
+    },
+    "TaskConstraints": {
+      "type": "object",
+      "properties": {
+        "timeout": { "type": "integer", "minimum": 0 },
+        "maxRetries": { "type": "integer", "minimum": 0 },
+        "requiredCapabilities": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "resourceLimits": {
+          "type": "object",
+          "properties": {
+            "maxMemory": { "type": "integer", "minimum": 0 },
+            "maxCpu": { "type": "integer", "minimum": 0 },
+            "maxTokens": { "type": "integer", "minimum": 1 }
+          }
+        }
+      }
+    },
+    "TaskResult": {
+      "type": "object",
+      "properties": {
+        "output": {},
+        "performance": {
+          "type": "object",
+          "properties": {
+            "duration": { "type": "integer", "minimum": 0 },
+            "tokensUsed": { "type": "integer", "minimum": 0 },
+            "retries": { "type": "integer", "minimum": 0 }
+          },
+          "required": ["duration"]
+        },
+        "artifacts": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/TaskArtifact" }
+        },
+        "logs": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/LogEntry" }
+        }
+      },
+      "required": ["output", "performance"]
+    },
+    "TaskArtifact": {
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "type": { "type": "string" },
+        "size": { "type": "integer", "minimum": 0 },
+        "content": {},
+        "url": { "type": "string", "format": "uri" },
+        "hash": { "type": "string" }
+      },
+      "required": ["name", "type"]
+    },
+    "LogEntry": {
+      "type": "object",
+      "properties": {
+        "timestamp": { "type": "string", "format": "date-time" },
+        "level": {
+          "type": "string",
+          "enum": ["debug", "info", "warn", "error"]
+        },
+        "message": { "type": "string" },
+        "data": {}
+      },
+      "required": ["timestamp", "level", "message"]
+    },
+    "AgentMessage": {
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "from": { "type": "string" },
+        "to": { "type": "string" },
+        "type": {
+          "type": "string",
+          "enum": ["request", "response", "event", "broadcast"]
+        },
+        "subject": { "type": "string" },
+        "content": {},
+        "metadata": { "$ref": "#/definitions/Metadata" },
+        "replyTo": { "type": "string" },
+        "expiresAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "from", "to", "type", "subject", "content"]
+    },
+    "JSONSchema": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "oneOf": [
+            { "type": "string" },
+            { "type": "array", "items": { "type": "string" } }
+          ]
+        },
+        "properties": {
+          "type": "object",
+          "additionalProperties": { "$ref": "#/definitions/JSONSchema" }
+        },
+        "items": {
+          "oneOf": [
+            { "$ref": "#/definitions/JSONSchema" },
+            { "type": "array", "items": { "$ref": "#/definitions/JSONSchema" } }
+          ]
+        },
+        "required": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "enum": { "type": "array" },
+        "const": {},
+        "description": { "type": "string" },
+        "default": {},
+        "minimum": { "type": "number" },
+        "maximum": { "type": "number" },
+        "minLength": { "type": "integer", "minimum": 0 },
+        "maxLength": { "type": "integer", "minimum": 0 },
+        "pattern": { "type": "string" },
+        "format": { "type": "string" },
+        "additionalProperties": {
+          "oneOf": [
+            { "type": "boolean" },
+            { "$ref": "#/definitions/JSONSchema" }
+          ]
+        },
+        "oneOf": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/JSONSchema" }
+        },
+        "anyOf": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/JSONSchema" }
+        },
+        "allOf": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/JSONSchema" }
+        },
+        "not": { "$ref": "#/definitions/JSONSchema" },
+        "$ref": { "type": "string" },
+        "$schema": { "type": "string" },
+        "definitions": {
+          "type": "object",
+          "additionalProperties": { "$ref": "#/definitions/JSONSchema" }
+        },
+        "title": { "type": "string" },
+        "examples": { "type": "array" }
+      }
+    },
+    "Metadata": {
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "version": { "type": "string" },
+        "timestamp": { "type": "string", "format": "date-time" },
+        "correlationId": { "type": "string" },
+        "source": { "type": "string" },
+        "environment": { "type": "string" },
+        "tags": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      },
+      "required": ["id", "version", "timestamp", "source"],
+      "additionalProperties": true
+    },
+    "Priority": {
+      "type": "string",
+      "enum": ["low", "normal", "high", "critical"]
+    },
+    "Status": {
+      "type": "string",
+      "enum": ["pending", "running", "completed", "failed", "cancelled", "timeout"]
+    }
+  }
+}

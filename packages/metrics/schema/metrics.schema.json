@@ -1,0 +1,207 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "DGMSTT Metrics Schema",
+  "description": "Schema for tracking cross-language tool execution metrics",
+  "definitions": {
+    "timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 timestamp"
+    },
+    "executionStatus": {
+      "type": "string",
+      "enum": ["success", "error", "timeout", "cancelled"],
+      "description": "Final execution status"
+    },
+    "language": {
+      "type": "string",
+      "enum": ["typescript", "python"],
+      "description": "Execution language"
+    },
+    "errorDetail": {
+      "type": "object",
+      "properties": {
+        "code": {
+          "type": "string",
+          "description": "Error code"
+        },
+        "message": {
+          "type": "string",
+          "description": "Error message"
+        },
+        "stack": {
+          "type": "string",
+          "description": "Stack trace if available"
+        },
+        "context": {
+          "type": "object",
+          "description": "Additional error context"
+        }
+      },
+      "required": ["code", "message"]
+    }
+  },
+  "type": "object",
+  "properties": {
+    "executionMetrics": {
+      "type": "object",
+      "properties": {
+        "toolId": {
+          "type": "string",
+          "description": "Unique identifier of the tool"
+        },
+        "executionId": {
+          "type": "string",
+          "description": "Unique execution instance ID"
+        },
+        "sessionId": {
+          "type": "string",
+          "description": "Session context ID"
+        },
+        "messageId": {
+          "type": "string",
+          "description": "Message context ID"
+        },
+        "language": {
+          "$ref": "#/definitions/language"
+        },
+        "startTime": {
+          "$ref": "#/definitions/timestamp"
+        },
+        "endTime": {
+          "$ref": "#/definitions/timestamp"
+        },
+        "duration": {
+          "type": "number",
+          "description": "Execution duration in milliseconds"
+        },
+        "status": {
+          "$ref": "#/definitions/executionStatus"
+        },
+        "error": {
+          "$ref": "#/definitions/errorDetail"
+        },
+        "rpcMetrics": {
+          "type": "object",
+          "properties": {
+            "requestSize": {
+              "type": "integer",
+              "description": "Size of JSON-RPC request in bytes"
+            },
+            "responseSize": {
+              "type": "integer",
+              "description": "Size of JSON-RPC response in bytes"
+            },
+            "serializationTime": {
+              "type": "number",
+              "description": "Time spent serializing/deserializing in ms"
+            },
+            "transportTime": {
+              "type": "number",
+              "description": "Time spent in transport layer in ms"
+            }
+          }
+        },
+        "resourceMetrics": {
+          "type": "object",
+          "properties": {
+            "cpuUsage": {
+              "type": "number",
+              "description": "CPU usage percentage during execution"
+            },
+            "memoryUsed": {
+              "type": "integer",
+              "description": "Memory used in bytes"
+            },
+            "memoryDelta": {
+              "type": "integer",
+              "description": "Memory change during execution"
+            }
+          }
+        },
+        "customMetrics": {
+          "type": "object",
+          "additionalProperties": true,
+          "description": "Tool-specific custom metrics"
+        }
+      },
+      "required": ["toolId", "executionId", "language", "startTime", "status"]
+    },
+    "aggregatedMetrics": {
+      "type": "object",
+      "properties": {
+        "toolId": {
+          "type": "string"
+        },
+        "language": {
+          "$ref": "#/definitions/language"
+        },
+        "period": {
+          "type": "string",
+          "enum": ["minute", "hour", "day", "week"],
+          "description": "Aggregation period"
+        },
+        "startTime": {
+          "$ref": "#/definitions/timestamp"
+        },
+        "endTime": {
+          "$ref": "#/definitions/timestamp"
+        },
+        "totalExecutions": {
+          "type": "integer"
+        },
+        "successCount": {
+          "type": "integer"
+        },
+        "errorCount": {
+          "type": "integer"
+        },
+        "timeoutCount": {
+          "type": "integer"
+        },
+        "cancelledCount": {
+          "type": "integer"
+        },
+        "successRate": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "averageDuration": {
+          "type": "number",
+          "description": "Average execution duration in ms"
+        },
+        "minDuration": {
+          "type": "number"
+        },
+        "maxDuration": {
+          "type": "number"
+        },
+        "p50Duration": {
+          "type": "number",
+          "description": "50th percentile duration"
+        },
+        "p90Duration": {
+          "type": "number",
+          "description": "90th percentile duration"
+        },
+        "p95Duration": {
+          "type": "number",
+          "description": "95th percentile duration"
+        },
+        "p99Duration": {
+          "type": "number",
+          "description": "99th percentile duration"
+        },
+        "errorBreakdown": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "integer"
+          },
+          "description": "Count of errors by error code"
+        }
+      },
+      "required": ["toolId", "language", "period", "startTime", "endTime"]
+    }
+  }
+}

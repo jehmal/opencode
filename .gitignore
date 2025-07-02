@@ -1,0 +1,124 @@
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# IDE
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+.idea/
+*.swp
+*.swo
+*~
+
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+.yarn/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv/
+venv/
+ENV/
+env/
+pip-log.txt
+pip-delete-this-directory.txt
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.mypy_cache/
+.dmypy.json
+dmypy.json
+*.egg-info/
+dist/
+build/
+
+# TypeScript
+dist/
+*.tsbuildinfo
+.next/
+out/
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Testing
+coverage/
+.nyc_output/
+
+# Docker
+.docker/
+
+# Cache
+.cache/
+dgm-cache/
+.parcel-cache/
+
+# Temporary files
+*.tmp
+*.temp
+.tmp/
+
+# Production builds
+build/
+dist/
+
+# Database
+*.sqlite
+*.sqlite3
+*.db
+
+# Certificates (keep example files)
+*.pem
+*.key
+*.crt
+!*.example.pem
+!*.example.key
+!*.example.crt
+
+# Uploads
+uploads/
+media/
+
+# Backups
+*.backup
+*.bak
+
+# Lock files (using bun, so exclude others)
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+# DGM specific
+output_dgm/
+initial/
+initial_polyglot/
+
+# Editor specific
+.cursor/
+.claude/
+.claude-trace/
+.bmad-core/
+
+# Temporary directories
+tmp/
+temp/

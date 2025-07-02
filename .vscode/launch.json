@@ -1,0 +1,107 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "OpenCode: Debug TypeScript",
+      "type": "node",
+      "request": "attach",
+      "port": 9229,
+      "address": "localhost",
+      "localRoot": "${workspaceFolder}/opencode",
+      "remoteRoot": "/app",
+      "protocol": "inspector",
+      "restart": true,
+      "skipFiles": [
+        "<node_internals>/**"
+      ]
+    },
+    {
+      "name": "DGM: Debug Python",
+      "type": "python",
+      "request": "attach",
+      "connect": {
+        "host": "localhost",
+        "port": 5678
+      },
+      "pathMappings": [
+        {
+          "localRoot": "${workspaceFolder}/dgm",
+          "remoteRoot": "/app"
+        }
+      ],
+      "justMyCode": false
+    },
+    {
+      "name": "OpenCode: Run Tests",
+      "type": "node",
+      "request": "launch",
+      "program": "${workspaceFolder}/opencode/node_modules/.bin/jest",
+      "args": [
+        "--runInBand",
+        "--coverage"
+      ],
+      "cwd": "${workspaceFolder}/opencode",
+      "console": "integratedTerminal",
+      "internalConsoleOptions": "neverOpen",
+      "env": {
+        "NODE_ENV": "test"
+      }
+    },
+    {
+      "name": "DGM: Run Tests",
+      "type": "python",
+      "request": "launch",
+      "module": "pytest",
+      "args": [
+        "-v",
+        "--cov=.",
+        "--cov-report=html"
+      ],
+      "cwd": "${workspaceFolder}/dgm",
+      "console": "integratedTerminal",
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}/dgm"
+      }
+    },
+    {
+      "name": "Docker: Attach to OpenCode",
+      "type": "node",
+      "request": "attach",
+      "port": 9229,
+      "address": "localhost",
+      "localRoot": "${workspaceFolder}/opencode",
+      "remoteRoot": "/app",
+      "protocol": "inspector",
+      "restart": true,
+      "sourceMaps": true,
+      "trace": true
+    },
+    {
+      "name": "Docker: Attach to DGM",
+      "type": "python",
+      "request": "attach",
+      "connect": {
+        "host": "localhost",
+        "port": 5678
+      },
+      "pathMappings": [
+        {
+          "localRoot": "${workspaceFolder}/dgm",
+          "remoteRoot": "/app"
+        }
+      ],
+      "justMyCode": false,
+      "django": false
+    }
+  ],
+  "compounds": [
+    {
+      "name": "Full Stack: Debug Both Services",
+      "configurations": [
+        "Docker: Attach to OpenCode",
+        "Docker: Attach to DGM"
+      ],
+      "stopAll": true
+    }
+  ]
+}

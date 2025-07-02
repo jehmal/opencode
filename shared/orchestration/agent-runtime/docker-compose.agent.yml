@@ -1,0 +1,74 @@
+version: '3.8'
+
+services:
+  agent-base:
+    build:
+      context: ../../../
+      dockerfile: shared/orchestration/agent-runtime/Dockerfile.agent
+    image: dgmstt/agent:latest
+    networks:
+      - agent-network
+    volumes:
+      - agent-workspace:/workspace/output
+      - ../../../shared/tools:/tools:ro
+      - ../../../dgm/tools:/workspace/dgm_tools:ro
+    environment:
+      - PYTHONUNBUFFERED=1
+      - LOG_LEVEL=INFO
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+      - seccomp:unconfined
+    cap_drop:
+      - ALL
+    healthcheck:
+      test: ["CMD", "python", "-c", "import requests; requests.get('http://localhost:8080/health')"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+
+  # Agent instances (can scale)
+  agent-1:
+    extends: agent-base
+    container_name: dgmstt-agent-1
+    ports:
+      - "8081:8080"
+    environment:
+      - AGENT_ID=agent-1
+      - AGENT_PORT=8080
+
+  agent-2:
+    extends: agent-base
+    container_name: dgmstt-agent-2
+    ports:
+      - "8082:8080"
+    environment:
+      - AGENT_ID=agent-2
+      - AGENT_PORT=8080
+
+  agent-3:
+    extends: agent-base
+    container_name: dgmstt-agent-3
+    ports:
+      - "8083:8080"
+    environment:
+      - AGENT_ID=agent-3
+      - AGENT_PORT=8080
+
+networks:
+  agent-network:
+    driver: bridge
+    name: dgmstt-agent-network
+
+volumes:
+  agent-workspace:
+    name: dgmstt-agent-workspace

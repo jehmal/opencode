@@ -1,0 +1,253 @@
+name: Integration Tests
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: '0 0 * * *' # Daily run
+
+jobs:
+  test-setup:
+    runs-on: ubuntu-latest
+    outputs:
+      cache-key: ${{ steps.cache.outputs.cache-key }}
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v1
+        with:
+          bun-version: latest
+      
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      
+      - name: Cache dependencies
+        id: cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            node_modules
+            ~/.bun/install/cache
+            ~/.cache/pip
+          key: ${{ runner.os }}-deps-${{ hashFiles('**/package.json', '**/requirements.txt', '**/bun.lockb') }}
+          restore-keys: |
+            ${{ runner.os }}-deps-
+      
+      - name: Install dependencies
+        run: |
+          bun install
+          pip install -r dgm/requirements.txt
+          pip install pytest pytest-asyncio aiohttp
+
+  typescript-tests:
+    needs: test-setup
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node-version: [18.x, 20.x]
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+      
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v1
+      
+      - name: Restore cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            node_modules
+            ~/.bun/install/cache
+          key: ${{ needs.test-setup.outputs.cache-key }}
+      
+      - name: Build TypeScript
+        run: bun run build
+      
+      - name: Run TypeScript unit tests
+        run: bun test --coverage
+      
+      - name: Upload coverage
+        uses: codecov/codecov-action@v3
+        with:
+          file: ./coverage/lcov.info
+          flags: typescript
+
+  python-tests:
+    needs: test-setup
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ['3.10', '3.11', '3.12']
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      
+      - name: Restore cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ needs.test-setup.outputs.cache-key }}
+      
+      - name: Install Python dependencies
+        run: |
+          pip install -r dgm/requirements.txt
+          pip install pytest pytest-asyncio pytest-cov aiohttp
+      
+      - name: Run Python tests
+        run: |
+          cd dgm
+          pytest tests/ --cov=. --cov-report=xml
+      
+      - name: Upload coverage
+        uses: codecov/codecov-action@v3
+        with:
+          file: ./dgm/coverage.xml
+          flags: python
+
+  integration-tests:
+    needs: [typescript-tests, python-tests]
+    runs-on: ubuntu-latest
+    services:
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v1
+      
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      
+      - name: Restore cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            node_modules
+            ~/.bun/install/cache
+            ~/.cache/pip
+          key: ${{ needs.test-setup.outputs.cache-key }}
+      
+      - name: Install dependencies
+        run: |
+          bun install
+          pip install -r dgm/requirements.txt
+          pip install pytest pytest-asyncio aiohttp
+      
+      - name: Start tool servers
+        run: |
+          # Start Python server in background
+          python -m shared.tools.server --port 8001 &
+          echo $! > python-server.pid
+          
+          # Start TypeScript server in background
+          bun run shared/tools/server.ts --port 8002 &
+          echo $! > ts-server.pid
+          
+          # Wait for servers to be ready
+          sleep 5
+          
+          # Check servers are running
+          curl -f http://localhost:8001/health || exit 1
+          curl -f http://localhost:8002/health || exit 1
+      
+      - name: Run integration tests
+        run: |
+          # Run TypeScript integration tests
+          bun test tests/integration/tool-protocol/
+          
+          # Run Python integration tests
+          pytest tests/integration/tool-protocol/test_python_tools.py -v
+      
+      - name: Run performance benchmarks
+        run: |
+          # Run performance tests with output
+          VERBOSE_TESTS=true bun test tests/integration/tool-protocol/performance.test.ts
+      
+      - name: Stop servers
+        if: always()
+        run: |
+          if [ -f python-server.pid ]; then
+            kill $(cat python-server.pid) || true
+          fi
+          if [ -f ts-server.pid ]; then
+            kill $(cat ts-server.pid) || true
+          fi
+      
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: integration-test-results
+          path: |
+            test-results/
+            coverage/
+
+  cross-platform-tests:
+    needs: test-setup
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v1
+      
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      
+      - name: Install dependencies
+        run: |
+          bun install
+          pip install -r dgm/requirements.txt
+          pip install pytest pytest-asyncio aiohttp
+      
+      - name: Run basic tool tests
+        run: |
+          # Test basic tool functionality on each platform
+          bun test tests/integration/tool-protocol/setup.ts
+
+  security-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Run security scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+      
+      - name: Upload security results
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: 'trivy-results.sarif'

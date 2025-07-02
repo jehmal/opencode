@@ -1,0 +1,63 @@
+{
+  "communication": {
+    "defaultTimeout": 300,
+    "retryAttempts": 3,
+    "retryDelay": 1000,
+    "endpoints": {
+      "opencode": "http://localhost:3000/api",
+      "dgm": "http://localhost:8000/api"
+    }
+  },
+  "models": {
+    "opencode": {
+      "default": "claude-3-opus-20240229",
+      "fallback": "gpt-4-turbo"
+    },
+    "dgm": {
+      "default": "claude-3-opus-20240229",
+      "optimization": "claude-3-sonnet-20240229"
+    }
+  },
+  "evaluation": {
+    "benchmarks": {
+      "swe": {
+        "timeout": 600,
+        "maxConcurrent": 4
+      },
+      "polyglot": {
+        "timeout": 300,
+        "maxConcurrent": 8
+      }
+    },
+    "metrics": {
+      "thresholds": {
+        "correctness": 0.95,
+        "performance": 0.80,
+        "readability": 0.85,
+        "maintainability": 0.90
+      }
+    }
+  },
+  "storage": {
+    "cache": {
+      "enabled": true,
+      "ttl": 3600,
+      "maxSize": "1GB"
+    },
+    "results": {
+      "format": "json",
+      "compression": true,
+      "retention": 30
+    }
+  },
+  "logging": {
+    "level": "info",
+    "format": "json",
+    "destinations": ["console", "file"],
+    "rotation": {
+      "maxSize": "100MB",
+      "maxAge": 7,
+      "compress": true
+    }
+  }
+}

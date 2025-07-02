@@ -1,0 +1,8 @@
+# Core dependencies for DGM integration
+asyncio
+typing
+logging
+
+# Note: The actual DGM dependencies (anthropic, openai, etc.) 
+# should be installed in the DGM environment
+# This adapter assumes it's running in the same environment as DGM

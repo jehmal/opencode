@@ -1,0 +1,172 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "OpenCode-DGM Communication Protocol",
+  "description": "Shared protocol definitions for cross-language communication",
+  "definitions": {
+    "TaskRequest": {
+      "type": "object",
+      "required": ["id", "type", "payload"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the task"
+        },
+        "type": {
+          "type": "string",
+          "enum": ["code_generation", "test_generation", "prompt_optimization", "evaluation"],
+          "description": "Type of task to perform"
+        },
+        "payload": {
+          "type": "object",
+          "description": "Task-specific payload"
+        },
+        "metadata": {
+          "type": "object",
+          "properties": {
+            "timestamp": {"type": "string", "format": "date-time"},
+            "source": {"type": "string"},
+            "priority": {"type": "string", "enum": ["low", "medium", "high"]},
+            "timeout": {"type": "integer", "description": "Timeout in seconds"}
+          }
+        }
+      }
+    },
+    "TaskResponse": {
+      "type": "object",
+      "required": ["id", "status", "result"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Task identifier matching the request"
+        },
+        "status": {
+          "type": "string",
+          "enum": ["success", "error", "timeout", "cancelled"],
+          "description": "Task execution status"
+        },
+        "result": {
+          "type": "object",
+          "description": "Task execution result"
+        },
+        "error": {
+          "type": "object",
+          "properties": {
+            "code": {"type": "string"},
+            "message": {"type": "string"},
+            "details": {"type": "object"}
+          }
+        },
+        "metadata": {
+          "type": "object",
+          "properties": {
+            "startTime": {"type": "string", "format": "date-time"},
+            "endTime": {"type": "string", "format": "date-time"},
+            "duration": {"type": "number", "description": "Duration in seconds"}
+          }
+        }
+      }
+    },
+    "CodeGenerationPayload": {
+      "type": "object",
+      "required": ["prompt", "language"],
+      "properties": {
+        "prompt": {"type": "string"},
+        "language": {"type": "string"},
+        "context": {
+          "type": "object",
+          "properties": {
+            "files": {
+              "type": "array",
+              "items": {"type": "string"}
+            },
+            "dependencies": {
+              "type": "array",
+              "items": {"type": "string"}
+            }
+          }
+        },
+        "constraints": {
+          "type": "object",
+          "properties": {
+            "maxTokens": {"type": "integer"},
+            "temperature": {"type": "number"},
+            "style": {"type": "string"}
+          }
+        }
+      }
+    },
+    "TestGenerationPayload": {
+      "type": "object",
+      "required": ["code", "framework"],
+      "properties": {
+        "code": {"type": "string"},
+        "framework": {"type": "string", "enum": ["jest", "pytest", "go_test", "junit"]},
+        "coverage": {
+          "type": "object",
+          "properties": {
+            "target": {"type": "number", "minimum": 0, "maximum": 100},
+            "types": {
+              "type": "array",
+              "items": {"type": "string", "enum": ["unit", "integration", "e2e"]}
+            }
+          }
+        }
+      }
+    },
+    "PromptOptimizationPayload": {
+      "type": "object",
+      "required": ["originalPrompt", "objective"],
+      "properties": {
+        "originalPrompt": {"type": "string"},
+        "objective": {"type": "string"},
+        "examples": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "input": {"type": "string"},
+              "output": {"type": "string"},
+              "score": {"type": "number"}
+            }
+          }
+        },
+        "constraints": {
+          "type": "object",
+          "properties": {
+            "maxLength": {"type": "integer"},
+            "techniques": {
+              "type": "array",
+              "items": {"type": "string"}
+            }
+          }
+        }
+      }
+    },
+    "EvaluationPayload": {
+      "type": "object",
+      "required": ["code", "tests"],
+      "properties": {
+        "code": {"type": "string"},
+        "tests": {
+          "type": "array",
+          "items": {"type": "string"}
+        },
+        "metrics": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": ["correctness", "performance", "readability", "maintainability"]
+          }
+        },
+        "environment": {
+          "type": "object",
+          "properties": {
+            "runtime": {"type": "string"},
+            "version": {"type": "string"},
+            "dependencies": {"type": "object"}
+          }
+        }
+      }
+    }
+  }
+}

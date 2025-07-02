@@ -1,0 +1,42 @@
+{
+  "name": "@dgmstt/tool-protocol",
+  "version": "1.0.0",
+  "description": "TypeScript implementation of the cross-language tool protocol",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "test": "jest",
+    "lint": "eslint src --ext .ts",
+    "prepare": "npm run build"
+  },
+  "keywords": [
+    "tools",
+    "protocol",
+    "cross-language",
+    "typescript",
+    "python"
+  ],
+  "author": "DGMSTT Team",
+  "license": "MIT",
+  "dependencies": {
+    "zod": "^3.22.0",
+    "@standard-schema/spec": "^1.0.0-beta.3",
+    "diff": "^5.1.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@types/diff": "^5.0.0",
+    "typescript": "^5.0.0",
+    "jest": "^29.0.0",
+    "@types/jest": "^29.0.0",
+    "ts-jest": "^29.0.0",
+    "eslint": "^8.0.0",
+    "@typescript-eslint/parser": "^6.0.0",
+    "@typescript-eslint/eslint-plugin": "^6.0.0"
+  },
+  "files": [
+    "dist",
+    "src"
+  ]
+}
