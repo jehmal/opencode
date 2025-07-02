@@ -12,12 +12,12 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea/v2"
 	"github.com/sst/opencode-sdk-go"
-	"github.com/sst/opencode/internal/commands"
-	"github.com/sst/opencode/internal/components/toast"
-	"github.com/sst/opencode/internal/config"
-	"github.com/sst/opencode/internal/styles"
-	"github.com/sst/opencode/internal/theme"
-	"github.com/sst/opencode/internal/util"
+	"github.com/sst/dgmo/internal/commands"
+	"github.com/sst/dgmo/internal/components/toast"
+	"github.com/sst/dgmo/internal/config"
+	"github.com/sst/dgmo/internal/styles"
+	"github.com/sst/dgmo/internal/theme"
+	"github.com/sst/dgmo/internal/util"
 )
 
 var RootPath string

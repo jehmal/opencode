@@ -72,9 +72,9 @@ export namespace Server {
         openAPISpecs(app, {
           documentation: {
             info: {
-              title: "opencode",
+              title: "dgmo",
               version: "0.0.2",
-              description: "opencode api",
+              description: "dgmo api",
             },
             openapi: "3.0.0",
           },
@@ -532,9 +532,9 @@ export namespace Server {
     const result = await generateSpecs(a, {
       documentation: {
         info: {
-          title: "opencode",
+          title: "dgmo",
           version: "1.0.0",
-          description: "opencode api",
+          description: "dgmo api",
         },
         openapi: "3.0.0",
       },

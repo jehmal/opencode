@@ -6,9 +6,9 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea/v2"
 	"github.com/charmbracelet/lipgloss/v2"
-	"github.com/sst/opencode/internal/app"
-	"github.com/sst/opencode/internal/styles"
-	"github.com/sst/opencode/internal/theme"
+	"github.com/sst/dgmo/internal/app"
+	"github.com/sst/dgmo/internal/styles"
+	"github.com/sst/dgmo/internal/theme"
 )
 
 type StatusComponent interface {
@@ -39,13 +39,13 @@ func (m statusComponent) logo() string {
 	base := styles.NewStyle().Foreground(t.TextMuted()).Background(t.BackgroundElement()).Render
 	emphasis := styles.NewStyle().Foreground(t.Text()).Background(t.BackgroundElement()).Bold(true).Render
 
-	open := base("open")
-	code := emphasis("code ")
+	dgm := base("dgm")
+	o := emphasis("o ")
 	version := base(m.app.Version)
 	return styles.NewStyle().
 		Background(t.BackgroundElement()).
 		Padding(0, 1).
-		Render(open + code + version)
+		Render(dgm + o + version)
 }
 
 func formatTokensAndCost(tokens float64, contextWindow float64, cost float64) string {

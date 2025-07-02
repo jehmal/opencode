@@ -12,11 +12,11 @@ import { Bus } from "../../bus"
 
 export const TuiCommand = cmd({
   command: "$0 [project]",
-  describe: "start opencode tui",
+  describe: "start dgmo tui",
   builder: (yargs) =>
     yargs.positional("project", {
       type: "string",
-      describe: "path to start opencode in",
+      describe: "path to start dgmo in",
     }),
   handler: async (args) => {
     while (true) {
@@ -37,10 +37,18 @@ export const TuiCommand = cmd({
           port: 0,
           hostname: "127.0.0.1",
         })
+        let serverStopped = false
+        const stopServer = () => {
+          if (!serverStopped && server) {
+            serverStopped = true
+            server.stop()
+          }
+        }
 
-        let cmd = ["go", "run", "./main.go"]
+        const goPath = Bun.which("go", { PATH: process.env["PATH"] }) || "/usr/bin/go"
+        let cmd = [goPath, "run", "./main.go"]
         let cwd = Bun.fileURLToPath(
-          new URL("../../../../tui/cmd/opencode", import.meta.url),
+          new URL("../../../../tui/cmd/dgmo", import.meta.url),
         )
         if (Bun.embeddedFiles.length > 0) {
           const blob = Bun.embeddedFiles[0] as File
@@ -65,11 +73,13 @@ export const TuiCommand = cmd({
           stdin: "inherit",
           env: {
             ...process.env,
-            OPENCODE_SERVER: server.url.toString(),
-            OPENCODE_APP_INFO: JSON.stringify(app),
+            DGMO_SERVER: `http://${server.hostname}:${server.port}`,
+            OPENCODE_SERVER: `http://${server.hostname}:${server.port}`, // Backwards compatibility
+            DGMO_APP_INFO: JSON.stringify(app),
+            OPENCODE_APP_INFO: JSON.stringify(app), // Backwards compatibility
           },
           onExit: () => {
-            server.stop()
+            stopServer()
           },
         })
 
@@ -91,7 +101,7 @@ export const TuiCommand = cmd({
         })()
 
         await proc.exited
-        server.stop()
+        stopServer()
 
         return "done"
       })

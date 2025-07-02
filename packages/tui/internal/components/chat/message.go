@@ -13,11 +13,11 @@ import (
 	"github.com/charmbracelet/lipgloss/v2/compat"
 	"github.com/charmbracelet/x/ansi"
 	"github.com/sst/opencode-sdk-go"
-	"github.com/sst/opencode/internal/app"
-	"github.com/sst/opencode/internal/components/diff"
-	"github.com/sst/opencode/internal/layout"
-	"github.com/sst/opencode/internal/styles"
-	"github.com/sst/opencode/internal/theme"
+	"github.com/sst/dgmo/internal/app"
+	"github.com/sst/dgmo/internal/components/diff"
+	"github.com/sst/dgmo/internal/layout"
+	"github.com/sst/dgmo/internal/styles"
+	"github.com/sst/dgmo/internal/theme"
 	"github.com/tidwall/gjson"
 	"golang.org/x/text/cases"
 	"golang.org/x/text/language"
@@ -459,8 +459,8 @@ func renderToolName(name string) string {
 		return "Plan"
 	default:
 		normalizedName := name
-		if strings.HasPrefix(name, "opencode_") {
-			normalizedName = strings.TrimPrefix(name, "opencode_")
+		if strings.HasPrefix(name, "dgmo_") {
+			normalizedName = strings.TrimPrefix(name, "dgmo_")
 		}
 		return cases.Title(language.Und).String(normalizedName)
 	}

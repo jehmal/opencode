@@ -202,6 +202,26 @@ export namespace Config {
             .optional(),
         })
         .optional(),
+      performance: z
+        .object({
+          enabled: z
+            .boolean()
+            .optional()
+            .default(false)
+            .describe("Enable performance tracking for tool execution"),
+          saveReports: z
+            .boolean()
+            .optional()
+            .default(true)
+            .describe("Save performance reports to storage"),
+          maxMetrics: z
+            .number()
+            .optional()
+            .default(1000)
+            .describe("Maximum number of metrics to keep in memory"),
+        })
+        .optional()
+        .describe("Performance tracking configuration"),
     })
     .strict()
     .openapi({

@@ -19,9 +19,9 @@ import (
 	"github.com/charmbracelet/lipgloss/v2/compat"
 	"github.com/charmbracelet/x/ansi"
 	"github.com/sergi/go-diff/diffmatchpatch"
-	stylesi "github.com/sst/opencode/internal/styles"
-	"github.com/sst/opencode/internal/theme"
-	"github.com/sst/opencode/internal/util"
+	stylesi "github.com/sst/dgmo/internal/styles"
+	"github.com/sst/dgmo/internal/theme"
+	"github.com/sst/dgmo/internal/util"
 )
 
 // -------------------------------------------------------------------------

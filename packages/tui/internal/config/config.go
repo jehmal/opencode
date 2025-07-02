@@ -25,7 +25,7 @@ type State struct {
 
 func NewState() *State {
 	return &State{
-		Theme:              "opencode",
+		Theme:              "dgmo",
 		RecentlyUsedModels: make([]ModelUsage, 0),
 	}
 }

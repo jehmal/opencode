@@ -7,11 +7,11 @@ import (
 	"github.com/charmbracelet/bubbles/v2/textarea"
 	tea "github.com/charmbracelet/bubbletea/v2"
 	"github.com/charmbracelet/lipgloss/v2"
-	"github.com/sst/opencode/internal/app"
-	"github.com/sst/opencode/internal/components/list"
-	"github.com/sst/opencode/internal/styles"
-	"github.com/sst/opencode/internal/theme"
-	"github.com/sst/opencode/internal/util"
+	"github.com/sst/dgmo/internal/app"
+	"github.com/sst/dgmo/internal/components/list"
+	"github.com/sst/dgmo/internal/styles"
+	"github.com/sst/dgmo/internal/theme"
+	"github.com/sst/dgmo/internal/util"
 )
 
 type CompletionItem struct {

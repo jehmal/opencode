@@ -3,11 +3,11 @@ package dialog
 import (
 	"github.com/charmbracelet/bubbles/v2/viewport"
 	tea "github.com/charmbracelet/bubbletea/v2"
-	"github.com/sst/opencode/internal/app"
-	commandsComponent "github.com/sst/opencode/internal/components/commands"
-	"github.com/sst/opencode/internal/components/modal"
-	"github.com/sst/opencode/internal/layout"
-	"github.com/sst/opencode/internal/theme"
+	"github.com/sst/dgmo/internal/app"
+	commandsComponent "github.com/sst/dgmo/internal/components/commands"
+	"github.com/sst/dgmo/internal/components/modal"
+	"github.com/sst/dgmo/internal/layout"
+	"github.com/sst/dgmo/internal/theme"
 )
 
 type helpDialog struct {

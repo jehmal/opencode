@@ -13,19 +13,19 @@ import (
 	"github.com/charmbracelet/lipgloss/v2"
 
 	"github.com/sst/opencode-sdk-go"
-	"github.com/sst/opencode/internal/app"
-	"github.com/sst/opencode/internal/commands"
-	"github.com/sst/opencode/internal/completions"
-	"github.com/sst/opencode/internal/components/chat"
-	cmdcomp "github.com/sst/opencode/internal/components/commands"
-	"github.com/sst/opencode/internal/components/dialog"
-	"github.com/sst/opencode/internal/components/modal"
-	"github.com/sst/opencode/internal/components/status"
-	"github.com/sst/opencode/internal/components/toast"
-	"github.com/sst/opencode/internal/layout"
-	"github.com/sst/opencode/internal/styles"
-	"github.com/sst/opencode/internal/theme"
-	"github.com/sst/opencode/internal/util"
+	"github.com/sst/dgmo/internal/app"
+	"github.com/sst/dgmo/internal/commands"
+	"github.com/sst/dgmo/internal/completions"
+	"github.com/sst/dgmo/internal/components/chat"
+	cmdcomp "github.com/sst/dgmo/internal/components/commands"
+	"github.com/sst/dgmo/internal/components/dialog"
+	"github.com/sst/dgmo/internal/components/modal"
+	"github.com/sst/dgmo/internal/components/status"
+	"github.com/sst/dgmo/internal/components/toast"
+	"github.com/sst/dgmo/internal/layout"
+	"github.com/sst/dgmo/internal/styles"
+	"github.com/sst/dgmo/internal/theme"
+	"github.com/sst/dgmo/internal/util"
 )
 
 // InterruptDebounceTimeoutMsg is sent when the interrupt key debounce timeout expires
@@ -292,7 +292,7 @@ func (a appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		a.showCompletionDialog = false
 	case opencode.EventListResponseEventInstallationUpdated:
 		return a, toast.NewSuccessToast(
-			"opencode updated to "+msg.Properties.Version+", restart to apply.",
+			"DGMO updated to "+msg.Properties.Version+", restart to apply.",
 			toast.WithTitle("New version installed"),
 		)
 	case opencode.EventListResponseEventSessionDeleted:
@@ -510,19 +510,19 @@ func (a appModel) home() string {
 	base := baseStyle.Render
 	muted := styles.NewStyle().Foreground(t.TextMuted()).Background(t.Background()).Render
 
-	open := `
-█▀▀█ █▀▀█ █▀▀ █▀▀▄ 
-█░░█ █░░█ █▀▀ █░░█ 
-▀▀▀▀ █▀▀▀ ▀▀▀ ▀  ▀ `
-	code := `
-█▀▀ █▀▀█ █▀▀▄ █▀▀
-█░░ █░░█ █░░█ █▀▀
-▀▀▀ ▀▀▀▀ ▀▀▀  ▀▀▀`
+	dgm := `
+█▀▀█ █▀▀ █▀▄▀█
+█░░█ █▀▀ █ █ █
+▀▀▀▀ ▀▀▀ ▀   ▀ `
+	mo := `
+█▀▄▀█ █▀▀█
+█ █ █ █░░█
+▀   ▀ ▀▀▀▀`
 
 	logo := lipgloss.JoinHorizontal(
 		lipgloss.Top,
-		muted(open),
-		base(code),
+		muted(dgm),
+		base(mo),
 	)
 	// cwd := app.Info.Path.Cwd
 	// config := app.Info.Path.Config

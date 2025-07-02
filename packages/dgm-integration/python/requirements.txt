@@ -1,0 +1,25 @@
+# Python dependencies for DGM Integration
+
+# Core dependencies
+typing-extensions>=4.0.0
+
+# For future DGM integration
+# numpy>=1.21.0
+# scipy>=1.7.0
+# networkx>=2.6.0
+# torch>=1.10.0  # If using PyTorch-based DGM
+
+# JSON handling (stdlib is sufficient for now)
+# ujson>=5.0.0  # Faster JSON parsing if needed
+
+# Async support (stdlib is sufficient for now)
+# aiofiles>=0.8.0
+# asyncio>=3.4.3
+
+# Logging and monitoring
+# python-json-logger>=2.0.0
+
+# Testing
+# pytest>=7.0.0
+# pytest-asyncio>=0.18.0
+# pytest-mock>=3.6.0

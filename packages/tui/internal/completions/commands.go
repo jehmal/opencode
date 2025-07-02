@@ -6,11 +6,11 @@ import (
 
 	"github.com/charmbracelet/lipgloss/v2"
 	"github.com/lithammer/fuzzysearch/fuzzy"
-	"github.com/sst/opencode/internal/app"
-	"github.com/sst/opencode/internal/commands"
-	"github.com/sst/opencode/internal/components/dialog"
-	"github.com/sst/opencode/internal/styles"
-	"github.com/sst/opencode/internal/theme"
+	"github.com/sst/dgmo/internal/app"
+	"github.com/sst/dgmo/internal/commands"
+	"github.com/sst/dgmo/internal/components/dialog"
+	"github.com/sst/dgmo/internal/styles"
+	"github.com/sst/dgmo/internal/theme"
 )
 
 type CommandCompletionProvider struct {

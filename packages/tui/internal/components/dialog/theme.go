@@ -2,11 +2,11 @@ package dialog
 
 import (
 	tea "github.com/charmbracelet/bubbletea/v2"
-	list "github.com/sst/opencode/internal/components/list"
-	"github.com/sst/opencode/internal/components/modal"
-	"github.com/sst/opencode/internal/layout"
-	"github.com/sst/opencode/internal/theme"
-	"github.com/sst/opencode/internal/util"
+	list "github.com/sst/dgmo/internal/components/list"
+	"github.com/sst/dgmo/internal/components/modal"
+	"github.com/sst/dgmo/internal/layout"
+	"github.com/sst/dgmo/internal/theme"
+	"github.com/sst/dgmo/internal/util"
 )
 
 // ThemeSelectedMsg is sent when the theme is changed

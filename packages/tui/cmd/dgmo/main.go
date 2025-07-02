@@ -11,8 +11,8 @@ import (
 	tea "github.com/charmbracelet/bubbletea/v2"
 	"github.com/sst/opencode-sdk-go"
 	"github.com/sst/opencode-sdk-go/option"
-	"github.com/sst/opencode/internal/app"
-	"github.com/sst/opencode/internal/tui"
+	"github.com/sst/dgmo/internal/app"
+	"github.com/sst/dgmo/internal/tui"
 )
 
 var Version = "dev"
@@ -23,9 +23,9 @@ func main() {
 		version = "v" + Version
 	}
 
-	url := os.Getenv("OPENCODE_SERVER")
+	url := os.Getenv("DGMO_SERVER")
 
-	appInfoStr := os.Getenv("OPENCODE_APP_INFO")
+	appInfoStr := os.Getenv("DGMO_APP_INFO")
 	var appInfo opencode.App
 	err := json.Unmarshal([]byte(appInfoStr), &appInfo)
 	if err != nil {

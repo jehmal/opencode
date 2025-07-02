@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+# DGMO - Self-Improving AI Coding Assistant
+
+# Get the actual DGMSTT directory location
+DGMSTT_DIR="/mnt/c/Users/jehma/Desktop/AI/DGMSTT"
+
+# Execute OpenCode with DGM integration
+exec bun "$DGMSTT_DIR/opencode/packages/opencode/src/index.ts" "$@"

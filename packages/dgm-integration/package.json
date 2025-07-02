@@ -1,0 +1,34 @@
+{
+  "$schema": "https://json.schemastore.org/package.json",
+  "name": "@opencode/dgm-integration",
+  "version": "0.0.1",
+  "type": "module",
+  "private": true,
+  "description": "DGM integration package for OpenCode - enables Python subprocess communication for enhanced tool capabilities",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "dev": "bun run ./src/index.ts",
+    "test": "bun test",
+    "build": "tsc"
+  },
+  "exports": {
+    ".": "./src/index.ts",
+    "./performance": "./src/performance.ts",
+    "./dgm-bridge": "./src/dgm-bridge.ts",
+    "./tool-sync": "./src/tool-sync.ts"
+  },
+  "devDependencies": {
+    "@tsconfig/bun": "1.0.7",
+    "@types/bun": "latest",
+    "@types/node": "^20.0.0",
+    "typescript": "catalog:"
+  },
+  "dependencies": {
+    "zod": "catalog:",
+    "remeda": "2.22.3",
+    "decimal.js": "10.5.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

@@ -52,10 +52,11 @@ export namespace Share {
   }
 
   export const URL =
+    process.env["DGMO_API"] ?? 
     process.env["OPENCODE_API"] ??
     (Installation.isSnapshot() || Installation.isDev()
-      ? "https://api.dev.opencode.ai"
-      : "https://api.opencode.ai")
+      ? "https://api.dev.dgmo.ai"
+      : "https://api.dgmo.ai")
 
   export async function create(sessionID: string) {
     return fetch(`${URL}/share_create`, {

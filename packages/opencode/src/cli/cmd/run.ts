@@ -24,7 +24,7 @@ const TOOL: Record<string, [string, string]> = {
 
 export const RunCommand = cmd({
   command: "run [message..]",
-  describe: "run opencode with a message",
+  describe: "run dgmo with a message",
   builder: (yargs: Argv) => {
     return yargs
       .positional("message", {
@@ -82,11 +82,11 @@ export const RunCommand = cmd({
       UI.empty()
 
       const cfg = await Config.get()
-      if (cfg.autoshare || Flag.OPENCODE_AUTO_SHARE || args.share) {
+      if (cfg.autoshare || Flag.DGMO_AUTO_SHARE || Flag.OPENCODE_AUTO_SHARE || args.share) {
         await Session.share(session.id)
         UI.println(
           UI.Style.TEXT_INFO_BOLD +
-            "~  https://opencode.ai/s/" +
+            "~  https://dgmo.ai/s/" +
             session.id.slice(-8),
         )
       }

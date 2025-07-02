@@ -4,7 +4,7 @@ import (
 	"strings"
 
 	"github.com/charmbracelet/lipgloss/v2"
-	"github.com/sst/opencode/internal/styles"
+	"github.com/sst/dgmo/internal/styles"
 )
 
 type Direction int

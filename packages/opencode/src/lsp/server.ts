@@ -57,9 +57,17 @@ export namespace LSPServer {
         PATH: process.env["PATH"] + ":" + Global.Path.bin,
       })
       if (!bin) {
+        // Check if Go is available before trying to install gopls
+        const goPath = Bun.which("go", {
+          PATH: process.env["PATH"],
+        })
+        if (!goPath) {
+          log.info("Go is not installed, skipping gopls installation")
+          return
+        }
         log.info("installing gopls")
         const proc = Bun.spawn({
-          cmd: ["go", "install", "golang.org/x/tools/gopls@latest"],
+          cmd: [goPath, "install", "golang.org/x/tools/gopls@latest"],
           env: { ...process.env, GOBIN: Global.Path.bin },
           stdout: "pipe",
           stderr: "pipe",
