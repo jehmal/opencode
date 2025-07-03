@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>DGMO Visual Mode Test</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        max-width: 800px;
+        margin: 0 auto;
+        padding: 20px;
+      }
+      .card {
+        border: 1px solid #ddd;
+        border-radius: 8px;
+        padding: 20px;
+        margin: 20px 0;
+        background: #f5f5f5;
+      }
+      button {
+        background: #007bff;
+        color: white;
+        border: none;
+        padding: 10px 20px;
+        border-radius: 4px;
+        cursor: pointer;
+        margin: 5px;
+      }
+      button:hover {
+        background: #0056b3;
+      }
+      .form-group {
+        margin: 15px 0;
+      }
+      label {
+        display: block;
+        margin-bottom: 5px;
+        font-weight: bold;
+      }
+      input,
+      textarea {
+        width: 100%;
+        padding: 8px;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>DGMO Visual Mode Test Page</h1>
+
+    <div class="card">
+      <h2>Welcome to Visual Mode Testing</h2>
+      <p>
+        This page has the Stagewise toolbar integrated. You should see it appear when the page
+        loads.
+      </p>
+      <p>
+        Try selecting any element on this page and it will send the selection to your DGMO terminal!
+      </p>
+    </div>
+
+    <div class="card">
+      <h2>Sample Form</h2>
+      <form>
+        <div class="form-group">
+          <label for="name">Name:</label>
+          <input type="text" id="name" placeholder="Enter your name" />
+        </div>
+        <div class="form-group">
+          <label for="email">Email:</label>
+          <input type="email" id="email" placeholder="Enter your email" />
+        </div>
+        <div class="form-group">
+          <label for="message">Message:</label>
+          <textarea id="message" rows="4" placeholder="Enter your message"></textarea>
+        </div>
+        <button type="submit">Submit</button>
+        <button type="reset">Reset</button>
+      </form>
+    </div>
+
+    <div class="card">
+      <h2>Interactive Elements</h2>
+      <button onclick="alert('Button 1 clicked!')">Click Me 1</button>
+      <button onclick="alert('Button 2 clicked!')">Click Me 2</button>
+      <button onclick="alert('Button 3 clicked!')">Click Me 3</button>
+    </div>
+
+    <!-- Stagewise Toolbar for DGMO Visual Mode -->
+    <script type="module">
+      // Auto-inject Stagewise toolbar if not already present
+      if (!document.querySelector('stagewise-toolbar')) {
+        const script = document.createElement('script');
+        script.type = 'module';
+        script.src = 'https://unpkg.com/@stagewise/toolbar@latest/dist/index.js';
+        document.head.appendChild(script);
+
+        const link = document.createElement('link');
+        link.rel = 'stylesheet';
+        link.href = 'https://unpkg.com/@stagewise/toolbar@latest/dist/style.css';
+        document.head.appendChild(link);
+
+        // Create toolbar element
+        setTimeout(() => {
+          const toolbar = document.createElement('stagewise-toolbar');
+          toolbar.setAttribute('framework', 'auto');
+          document.body.appendChild(toolbar);
+          console.log('Stagewise toolbar added to page');
+        }, 1000);
+      }
+    </script>
+  </body>
+</html>

@@ -1,0 +1,280 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>DGMO Visual Mode - Local Script Example</title>
+    <style>
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        max-width: 800px;
+        margin: 0 auto;
+        padding: 2rem;
+        line-height: 1.6;
+        background: #f9fafb;
+      }
+      .hero {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 3rem;
+        border-radius: 12px;
+        margin-bottom: 2rem;
+        text-align: center;
+      }
+      .instructions {
+        background: #e0f2fe;
+        border: 2px solid #0284c7;
+        border-radius: 8px;
+        padding: 1.5rem;
+        margin: 2rem 0;
+      }
+      .step {
+        background: white;
+        border-radius: 8px;
+        padding: 1.5rem;
+        margin: 1rem 0;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+      }
+      .step h3 {
+        color: #0284c7;
+        margin-top: 0;
+      }
+      code {
+        background: #f3f4f6;
+        padding: 0.2rem 0.4rem;
+        border-radius: 3px;
+        font-family: 'Consolas', 'Monaco', monospace;
+        font-size: 0.9em;
+      }
+      pre {
+        background: #1f2937;
+        color: #f9fafb;
+        padding: 1rem;
+        border-radius: 6px;
+        overflow-x: auto;
+        line-height: 1.4;
+      }
+      .demo-section {
+        background: white;
+        border-radius: 8px;
+        padding: 2rem;
+        margin: 2rem 0;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+      }
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: 1rem;
+        margin: 1rem 0;
+      }
+      .card {
+        background: #f3f4f6;
+        border: 1px solid #e5e7eb;
+        border-radius: 6px;
+        padding: 1.5rem;
+        transition: transform 0.2s;
+      }
+      .card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+      }
+      .button {
+        display: inline-block;
+        padding: 0.75rem 1.5rem;
+        border-radius: 6px;
+        text-decoration: none;
+        font-weight: 500;
+        transition: all 0.2s;
+        cursor: pointer;
+        border: none;
+        font-size: 1rem;
+      }
+      .button-primary {
+        background: #3b82f6;
+        color: white;
+      }
+      .button-primary:hover {
+        background: #2563eb;
+      }
+      .button-secondary {
+        background: #e5e7eb;
+        color: #374151;
+      }
+      .button-secondary:hover {
+        background: #d1d5db;
+      }
+      .warning {
+        background: #fef3c7;
+        border: 1px solid #f59e0b;
+        border-radius: 6px;
+        padding: 1rem;
+        margin: 1rem 0;
+      }
+      .success {
+        background: #d1fae5;
+        border: 1px solid #10b981;
+        border-radius: 6px;
+        padding: 1rem;
+        margin: 1rem 0;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="hero">
+      <h1>DGMO Visual Mode - Local Script Example</h1>
+      <p>Avoid CORS issues by downloading and serving the Stagewise toolbar locally</p>
+    </div>
+
+    <div class="instructions">
+      <h2>🚀 Quick Setup Guide</h2>
+      <p>
+        This method works even with <code>file://</code> protocol by using a locally downloaded
+        toolbar script.
+      </p>
+    </div>
+
+    <div class="step">
+      <h3>Step 1: Download Stagewise Toolbar</h3>
+      <p>First, download the toolbar files to your project:</p>
+      <pre>
+# Create a vendor directory
+mkdir -p vendor/stagewise
+
+# Download the toolbar script
+curl -o vendor/stagewise/toolbar.js \
+  https://unpkg.com/@stagewise/toolbar@0.4.9/dist/index.js
+
+# Download the toolbar styles
+curl -o vendor/stagewise/toolbar.css \
+  https://unpkg.com/@stagewise/toolbar@0.4.9/dist/style.css</pre
+      >
+
+      <div class="warning">
+        <strong>Note:</strong> Make sure to download both the JavaScript and CSS files to the same
+        directory.
+      </div>
+    </div>
+
+    <div class="step">
+      <h3>Step 2: Update Your HTML</h3>
+      <p>Reference the local files instead of the CDN:</p>
+      <pre>
+&lt;!-- Local Stagewise Toolbar --&gt;
+&lt;script type="module" src="vendor/stagewise/toolbar.js"&gt;&lt;/script&gt;
+&lt;link rel="stylesheet" href="vendor/stagewise/toolbar.css"&gt;
+
+&lt;!-- Add the toolbar element --&gt;
+&lt;stagewise-toolbar framework="vanilla"&gt;&lt;/stagewise-toolbar&gt;</pre
+      >
+    </div>
+
+    <div class="step">
+      <h3>Step 3: Start DGMO</h3>
+      <pre>dgmo run --visual "help me improve this page"</pre>
+
+      <div class="success">
+        <strong>✅ Success!</strong> You can now open this HTML file directly without any HTTP
+        server.
+      </div>
+    </div>
+
+    <div class="demo-section">
+      <h2>Interactive Demo Components</h2>
+      <p>Try selecting these elements with the Stagewise toolbar:</p>
+
+      <div class="grid">
+        <div class="card">
+          <h3>Feature Card</h3>
+          <p>Ask DGMO to enhance this card with animations or better styling.</p>
+          <button class="button button-primary">Learn More</button>
+        </div>
+
+        <div class="card">
+          <h3>Pricing Card</h3>
+          <p>Get help creating a professional pricing component.</p>
+          <div style="font-size: 2rem; font-weight: bold; margin: 1rem 0">$29/mo</div>
+          <button class="button button-secondary">Choose Plan</button>
+        </div>
+
+        <div class="card">
+          <h3>Stats Card</h3>
+          <p>Transform this into a dynamic dashboard widget.</p>
+          <div style="display: flex; justify-content: space-around; margin: 1rem 0">
+            <div style="text-align: center">
+              <div style="font-size: 1.5rem; font-weight: bold">1,234</div>
+              <div style="color: #6b7280">Users</div>
+            </div>
+            <div style="text-align: center">
+              <div style="font-size: 1.5rem; font-weight: bold">98%</div>
+              <div style="color: #6b7280">Uptime</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div style="margin-top: 2rem">
+        <h3>Navigation Example</h3>
+        <nav style="background: #1f2937; padding: 1rem; border-radius: 6px">
+          <ul style="list-style: none; padding: 0; margin: 0; display: flex; gap: 2rem">
+            <li><a href="#" style="color: white; text-decoration: none">Home</a></li>
+            <li><a href="#" style="color: #9ca3af; text-decoration: none">Features</a></li>
+            <li><a href="#" style="color: #9ca3af; text-decoration: none">Pricing</a></li>
+            <li><a href="#" style="color: #9ca3af; text-decoration: none">Contact</a></li>
+          </ul>
+        </nav>
+      </div>
+    </div>
+
+    <div class="demo-section" style="background: #fef3c7">
+      <h2>💡 Pro Tips</h2>
+      <ul>
+        <li>
+          <strong>Version Control:</strong> Commit the downloaded toolbar files to your repository
+        </li>
+        <li><strong>Updates:</strong> Periodically check for new toolbar versions</li>
+        <li><strong>Multiple Projects:</strong> Share the vendor folder across projects</li>
+        <li>
+          <strong>Offline Development:</strong> Works without internet connection once downloaded
+        </li>
+      </ul>
+    </div>
+
+    <div class="demo-section">
+      <h2>Alternative: Using DGMO's Built-in Server</h2>
+      <p>You can also use DGMO's visual server directly:</p>
+      <pre>
+# This starts both DGMO and a development server
+dgmo visual serve --port 3000
+
+# Then open http://localhost:3000 in your browser</pre
+      >
+    </div>
+
+    <!-- 
+    NOTE: This example assumes you've downloaded the toolbar locally.
+    For this demo, we'll still load from CDN, but in real usage,
+    you would reference your local files as shown in the instructions.
+    -->
+    <script type="module">
+      // For demo purposes, still loading from CDN
+      // In real usage, this would be: src="vendor/stagewise/toolbar.js"
+      if (!document.querySelector('stagewise-toolbar')) {
+        const script = document.createElement('script');
+        script.type = 'module';
+        script.src = 'https://unpkg.com/@stagewise/toolbar@0.4.9/dist/index.js';
+        document.head.appendChild(script);
+
+        const link = document.createElement('link');
+        link.rel = 'stylesheet';
+        link.href = 'https://unpkg.com/@stagewise/toolbar@0.4.9/dist/style.css';
+        document.head.appendChild(link);
+
+        setTimeout(() => {
+          const toolbar = document.createElement('stagewise-toolbar');
+          toolbar.setAttribute('framework', 'vanilla');
+          document.body.appendChild(toolbar);
+        }, 1000);
+      }
+    </script>
+  </body>
+</html>

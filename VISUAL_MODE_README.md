@@ -17,18 +17,21 @@ Visual mode allows you to:
 ### Components Created
 
 1. **WebSocket Server** (`/opencode/packages/opencode/src/visual/server.ts`)
+
    - Implements SRPC protocol compatible with Stagewise
    - Runs on port 5746 (auto-increments if busy)
    - Handles `getSessionInfo` and `triggerAgentPrompt` methods
    - Publishes visual prompts to the Bus event system
 
 2. **Terminal Integration** (`/opencode/packages/opencode/src/cli/cmd/run.ts`)
+
    - Added `--visual` flag to enable visual mode
    - Starts WebSocket server alongside terminal chat
    - Subscribes to visual prompt events
    - Displays visual selections in terminal with context
 
 3. **Stagewise Adapter** (`/opencode/packages/opencode/src/visual/stagewise-adapter.ts`)
+
    - Makes DGMO discoverable by Stagewise toolbar
    - Manages active visual mode sessions
    - Provides session info in Stagewise format
@@ -169,17 +172,53 @@ dgmo run --visual "help me style this button"
 
 ## Troubleshooting
 
+### CORS Error: "Access to script blocked by CORS policy"
+
+This is the most common issue when loading Stagewise toolbar. It happens when opening HTML files
+directly (file:// protocol).
+
+**Quick Solutions:**
+
+1. **Use DGMO's built-in server (Recommended)**
+
+   ```bash
+   dgmo visual serve
+   # Opens browser automatically with proper HTTP server
+   ```
+
+2. **Use any HTTP server**
+
+   ```bash
+   # Python
+   python -m http.server 8000
+
+   # Node.js
+   npx http-server
+
+   # Then open http://localhost:8000
+   ```
+
+3. **Download toolbar locally**
+   ```bash
+   # Future feature (coming soon):
+   dgmo visual-setup --download-toolbar
+   ```
+
+See `visual-mode-examples/` directory for complete examples of each approach.
+
 ### Toolbar not connecting
 
 - Ensure DGMO is running with `--visual` flag
 - Check console for connection errors
 - Verify port 5746 is not blocked
+- If using file://, switch to HTTP server (see CORS section above)
 
 ### No visual prompts appearing
 
 - Check DGMO terminal for "Visual mode active" message
 - Ensure toolbar shows DGMO in connection list
 - Verify WebSocket connection in browser DevTools
+- Check for CORS errors in browser console
 
 ### Framework detection issues
 

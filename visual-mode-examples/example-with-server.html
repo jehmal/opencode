@@ -1,0 +1,197 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>DGMO Visual Mode - HTTP Server Example</title>
+    <style>
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        max-width: 800px;
+        margin: 0 auto;
+        padding: 2rem;
+        line-height: 1.6;
+      }
+      .container {
+        background: #f5f5f5;
+        border-radius: 8px;
+        padding: 2rem;
+        margin: 2rem 0;
+      }
+      .button-group {
+        display: flex;
+        gap: 1rem;
+        margin: 2rem 0;
+      }
+      button {
+        padding: 0.75rem 1.5rem;
+        border: none;
+        border-radius: 4px;
+        font-size: 1rem;
+        cursor: pointer;
+        transition: all 0.2s;
+      }
+      .btn-primary {
+        background: #3b82f6;
+        color: white;
+      }
+      .btn-primary:hover {
+        background: #2563eb;
+      }
+      .btn-secondary {
+        background: #6b7280;
+        color: white;
+      }
+      .btn-secondary:hover {
+        background: #4b5563;
+      }
+      .card {
+        background: white;
+        border: 1px solid #e5e7eb;
+        border-radius: 8px;
+        padding: 1.5rem;
+        margin: 1rem 0;
+      }
+      .instructions {
+        background: #fef3c7;
+        border: 1px solid #fbbf24;
+        border-radius: 4px;
+        padding: 1rem;
+        margin: 2rem 0;
+      }
+      code {
+        background: #f3f4f6;
+        padding: 0.2rem 0.4rem;
+        border-radius: 3px;
+        font-family: 'Consolas', 'Monaco', monospace;
+      }
+      pre {
+        background: #1f2937;
+        color: #f9fafb;
+        padding: 1rem;
+        border-radius: 4px;
+        overflow-x: auto;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>DGMO Visual Mode - HTTP Server Example</h1>
+
+    <div class="instructions">
+      <h2>📋 Instructions</h2>
+      <p>
+        This example demonstrates using DGMO Visual Mode with an HTTP server to avoid CORS issues.
+      </p>
+
+      <h3>Step 1: Start DGMO with Visual Mode</h3>
+      <pre>dgmo run --visual "help me improve this UI"</pre>
+
+      <h3>Step 2: Serve this file via HTTP</h3>
+      <p>Choose one of these methods:</p>
+      <pre>
+# Python (most common)
+python -m http.server 8000
+
+# Node.js
+npx http-server -p 8000
+
+# PHP
+php -S localhost:8000
+
+# Ruby
+ruby -run -e httpd . -p 8000</pre
+      >
+
+      <h3>Step 3: Open in Browser</h3>
+      <p>Navigate to: <code>http://localhost:8000/example-with-server.html</code></p>
+
+      <h3>Step 4: Use Stagewise Toolbar</h3>
+      <p>
+        The toolbar should appear at the bottom of the page. Select any element and add comments!
+      </p>
+    </div>
+
+    <div class="container">
+      <h2>Example Components</h2>
+      <p>Select any of these elements with the Stagewise toolbar to get AI assistance:</p>
+
+      <div class="button-group">
+        <button class="btn-primary">Primary Button</button>
+        <button class="btn-secondary">Secondary Button</button>
+      </div>
+
+      <div class="card">
+        <h3>Card Component</h3>
+        <p>This is a simple card component. You can ask DGMO to:</p>
+        <ul>
+          <li>Change the styling</li>
+          <li>Add animations</li>
+          <li>Make it responsive</li>
+          <li>Convert to a React/Vue component</li>
+        </ul>
+      </div>
+
+      <form style="margin: 2rem 0">
+        <h3>Form Example</h3>
+        <div style="margin: 1rem 0">
+          <label for="name" style="display: block; margin-bottom: 0.5rem">Name:</label>
+          <input
+            type="text"
+            id="name"
+            style="width: 100%; padding: 0.5rem; border: 1px solid #d1d5db; border-radius: 4px"
+          />
+        </div>
+        <div style="margin: 1rem 0">
+          <label for="email" style="display: block; margin-bottom: 0.5rem">Email:</label>
+          <input
+            type="email"
+            id="email"
+            style="width: 100%; padding: 0.5rem; border: 1px solid #d1d5db; border-radius: 4px"
+          />
+        </div>
+        <button type="submit" class="btn-primary">Submit</button>
+      </form>
+    </div>
+
+    <div class="container" style="background: #fee2e2">
+      <h2>Why HTTP Server?</h2>
+      <p>
+        When you open HTML files directly (file:// protocol), browsers enforce strict CORS policies
+        that block external scripts from loading. This is a security feature to prevent malicious
+        local files from accessing web resources.
+      </p>
+      <p>
+        By serving the file through an HTTP server, you get a proper origin (http://localhost:8000)
+        which allows the Stagewise toolbar script to load correctly.
+      </p>
+    </div>
+
+    <!-- Stagewise Toolbar Integration -->
+    <script type="module">
+      // Only inject toolbar if not already present
+      if (!document.querySelector('stagewise-toolbar')) {
+        console.log('Loading Stagewise toolbar...');
+
+        const script = document.createElement('script');
+        script.type = 'module';
+        script.src = 'https://unpkg.com/@stagewise/toolbar@0.4.9/dist/index.js';
+        script.onload = () => console.log('Stagewise toolbar loaded successfully');
+        script.onerror = (e) => console.error('Failed to load Stagewise toolbar:', e);
+        document.head.appendChild(script);
+
+        const link = document.createElement('link');
+        link.rel = 'stylesheet';
+        link.href = 'https://unpkg.com/@stagewise/toolbar@0.4.9/dist/style.css';
+        document.head.appendChild(link);
+
+        // Wait a bit for the script to load, then create the toolbar
+        setTimeout(() => {
+          const toolbar = document.createElement('stagewise-toolbar');
+          toolbar.setAttribute('framework', 'vanilla');
+          document.body.appendChild(toolbar);
+          console.log('Stagewise toolbar element added to page');
+        }, 1000);
+      }
+    </script>
+  </body>
+</html>

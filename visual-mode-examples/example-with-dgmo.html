@@ -1,0 +1,643 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>DGMO Visual Mode - Using DGMO Server</title>
+    <style>
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        margin: 0;
+        padding: 0;
+        background: #0f172a;
+        color: #e2e8f0;
+        min-height: 100vh;
+      }
+      .container {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 2rem;
+      }
+      .header {
+        text-align: center;
+        padding: 4rem 0;
+        background: linear-gradient(to bottom, #1e293b, #0f172a);
+        border-bottom: 1px solid #334155;
+      }
+      .header h1 {
+        font-size: 3rem;
+        margin: 0;
+        background: linear-gradient(to right, #60a5fa, #a78bfa);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+      }
+      .header p {
+        color: #94a3b8;
+        font-size: 1.25rem;
+        margin-top: 1rem;
+      }
+      .content {
+        display: grid;
+        grid-template-columns: 1fr 2fr;
+        gap: 2rem;
+        margin-top: 3rem;
+      }
+      .sidebar {
+        background: #1e293b;
+        border-radius: 12px;
+        padding: 2rem;
+        height: fit-content;
+        position: sticky;
+        top: 2rem;
+      }
+      .main {
+        background: #1e293b;
+        border-radius: 12px;
+        padding: 2rem;
+      }
+      .step-indicator {
+        display: flex;
+        align-items: center;
+        margin-bottom: 1.5rem;
+      }
+      .step-number {
+        width: 40px;
+        height: 40px;
+        background: #3b82f6;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: bold;
+        margin-right: 1rem;
+      }
+      .step-title {
+        font-size: 1.25rem;
+        font-weight: 600;
+      }
+      .code-block {
+        background: #0f172a;
+        border: 1px solid #334155;
+        border-radius: 8px;
+        padding: 1.5rem;
+        margin: 1rem 0;
+        overflow-x: auto;
+        position: relative;
+      }
+      .code-block pre {
+        margin: 0;
+        color: #e2e8f0;
+        font-family: 'Consolas', 'Monaco', monospace;
+        font-size: 0.9rem;
+        line-height: 1.5;
+      }
+      .copy-button {
+        position: absolute;
+        top: 0.5rem;
+        right: 0.5rem;
+        background: #334155;
+        border: none;
+        color: #e2e8f0;
+        padding: 0.5rem 1rem;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 0.875rem;
+        transition: background 0.2s;
+      }
+      .copy-button:hover {
+        background: #475569;
+      }
+      .feature-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+        gap: 1.5rem;
+        margin: 2rem 0;
+      }
+      .feature-card {
+        background: #0f172a;
+        border: 1px solid #334155;
+        border-radius: 8px;
+        padding: 1.5rem;
+        transition: all 0.3s;
+      }
+      .feature-card:hover {
+        border-color: #3b82f6;
+        transform: translateY(-2px);
+      }
+      .feature-icon {
+        width: 48px;
+        height: 48px;
+        background: #1e3a8a;
+        border-radius: 8px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.5rem;
+        margin-bottom: 1rem;
+      }
+      .demo-component {
+        background: #0f172a;
+        border: 2px dashed #334155;
+        border-radius: 8px;
+        padding: 2rem;
+        margin: 2rem 0;
+        text-align: center;
+        transition: border-color 0.3s;
+      }
+      .demo-component:hover {
+        border-color: #3b82f6;
+      }
+      .status-indicator {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.5rem 1rem;
+        background: #1e293b;
+        border-radius: 20px;
+        font-size: 0.875rem;
+      }
+      .status-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: #10b981;
+        animation: pulse 2s infinite;
+      }
+      @keyframes pulse {
+        0% {
+          opacity: 1;
+        }
+        50% {
+          opacity: 0.5;
+        }
+        100% {
+          opacity: 1;
+        }
+      }
+      .terminal-preview {
+        background: #000;
+        border-radius: 8px;
+        padding: 1rem;
+        margin: 1rem 0;
+        font-family: 'Consolas', 'Monaco', monospace;
+        font-size: 0.875rem;
+        color: #10b981;
+      }
+      .highlight {
+        background: #3b82f6;
+        color: white;
+        padding: 0.2rem 0.5rem;
+        border-radius: 4px;
+        font-weight: 500;
+      }
+      .nav-links {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+      }
+      .nav-links li {
+        margin-bottom: 1rem;
+      }
+      .nav-links a {
+        color: #94a3b8;
+        text-decoration: none;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        transition: color 0.2s;
+      }
+      .nav-links a:hover {
+        color: #e2e8f0;
+      }
+      .alert {
+        background: #1e3a8a;
+        border: 1px solid #3b82f6;
+        border-radius: 8px;
+        padding: 1rem;
+        margin: 1rem 0;
+        display: flex;
+        align-items: start;
+        gap: 1rem;
+      }
+      .alert-icon {
+        font-size: 1.5rem;
+        color: #60a5fa;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="header">
+      <h1>DGMO Visual Mode</h1>
+      <p>The seamless way to connect your browser to DGMO</p>
+      <div class="status-indicator">
+        <span class="status-dot"></span>
+        <span>Ready to connect</span>
+      </div>
+    </div>
+
+    <div class="container">
+      <div class="content">
+        <aside class="sidebar">
+          <h3>Quick Navigation</h3>
+          <ul class="nav-links">
+            <li><a href="#setup">🚀 Setup Guide</a></li>
+            <li><a href="#features">✨ Features</a></li>
+            <li><a href="#demo">🎯 Demo Components</a></li>
+            <li><a href="#troubleshooting">🔧 Troubleshooting</a></li>
+            <li><a href="#advanced">🎓 Advanced Usage</a></li>
+          </ul>
+
+          <div class="alert" style="margin-top: 2rem">
+            <span class="alert-icon">💡</span>
+            <div>
+              <strong>Pro Tip:</strong> DGMO's visual server automatically handles CORS, making it
+              the easiest solution for local development.
+            </div>
+          </div>
+        </aside>
+
+        <main class="main">
+          <section id="setup">
+            <h2>Getting Started with DGMO Visual Server</h2>
+            <p>
+              The DGMO visual server is the recommended way to use visual mode. It handles all CORS
+              issues automatically and provides additional development features.
+            </p>
+
+            <div class="step-indicator">
+              <div class="step-number">1</div>
+              <div class="step-title">Start DGMO with Visual Mode</div>
+            </div>
+            <div class="code-block">
+              <button class="copy-button" onclick="copyCode(this)">Copy</button>
+              <pre>dgmo run --visual "help me build an amazing UI"</pre>
+            </div>
+            <p>
+              This command starts DGMO with visual mode enabled. The WebSocket server will
+              automatically start on port 5746.
+            </p>
+
+            <div class="step-indicator">
+              <div class="step-number">2</div>
+              <div class="step-title">Optional: Start Development Server</div>
+            </div>
+            <div class="code-block">
+              <button class="copy-button" onclick="copyCode(this)">Copy</button>
+              <pre>
+# If you want a built-in HTTP server
+dgmo visual serve --port 3000
+
+# This will:
+# 1. Start DGMO in visual mode
+# 2. Launch an HTTP server on port 3000
+# 3. Open your default browser automatically</pre
+              >
+            </div>
+
+            <div class="step-indicator">
+              <div class="step-number">3</div>
+              <div class="step-title">Connect with Stagewise</div>
+            </div>
+            <p>
+              The Stagewise toolbar will automatically detect DGMO running on your machine. Look for
+              the connection indicator in the toolbar.
+            </p>
+
+            <div class="terminal-preview">
+              <div>🚀 DGMO Visual Mode Active</div>
+              <div>📡 WebSocket server listening on port 5746</div>
+              <div>🔗 Stagewise toolbar ready for connections</div>
+              <div>✨ Select any element in your browser to get started!</div>
+            </div>
+          </section>
+
+          <section id="features" style="margin-top: 4rem">
+            <h2>Why Use DGMO's Visual Server?</h2>
+
+            <div class="feature-grid">
+              <div class="feature-card">
+                <div class="feature-icon">🛡️</div>
+                <h3>No CORS Issues</h3>
+                <p>
+                  DGMO's server handles all cross-origin requests automatically. No need to
+                  configure headers or worry about browser security.
+                </p>
+              </div>
+
+              <div class="feature-card">
+                <div class="feature-icon">⚡</div>
+                <h3>Zero Configuration</h3>
+                <p>
+                  Just run the command and start coding. No complex setup, no configuration files,
+                  no dependencies to install.
+                </p>
+              </div>
+
+              <div class="feature-card">
+                <div class="feature-icon">🔄</div>
+                <h3>Hot Reload Support</h3>
+                <p>
+                  Changes are reflected immediately. The visual server maintains connections even as
+                  you modify your code.
+                </p>
+              </div>
+
+              <div class="feature-card">
+                <div class="feature-icon">🎯</div>
+                <h3>Framework Agnostic</h3>
+                <p>
+                  Works with React, Vue, Angular, Svelte, or vanilla HTML. DGMO adapts to your
+                  project structure.
+                </p>
+              </div>
+
+              <div class="feature-card">
+                <div class="feature-icon">🔍</div>
+                <h3>Smart Detection</h3>
+                <p>
+                  Automatically detects your framework and provides relevant suggestions and code
+                  generation.
+                </p>
+              </div>
+
+              <div class="feature-card">
+                <div class="feature-icon">🚀</div>
+                <h3>Performance First</h3>
+                <p>
+                  Lightweight WebSocket connection ensures minimal overhead and maximum
+                  responsiveness.
+                </p>
+              </div>
+            </div>
+          </section>
+
+          <section id="demo" style="margin-top: 4rem">
+            <h2>Interactive Demo Components</h2>
+            <p>Select any of these components with the Stagewise toolbar to see DGMO in action:</p>
+
+            <div class="demo-component">
+              <h3>Hero Section</h3>
+              <p>
+                Ask DGMO to make this hero section more engaging with animations and better
+                typography.
+              </p>
+              <button
+                style="
+                  background: #3b82f6;
+                  color: white;
+                  border: none;
+                  padding: 1rem 2rem;
+                  border-radius: 8px;
+                  font-size: 1.125rem;
+                  cursor: pointer;
+                  margin-top: 1rem;
+                "
+              >
+                Get Started
+              </button>
+            </div>
+
+            <div class="demo-component">
+              <h3>Dashboard Widget</h3>
+              <div
+                style="
+                  display: grid;
+                  grid-template-columns: repeat(3, 1fr);
+                  gap: 1rem;
+                  margin-top: 1rem;
+                "
+              >
+                <div
+                  style="background: #1e293b; padding: 1rem; border-radius: 8px; text-align: center"
+                >
+                  <div style="font-size: 2rem; font-weight: bold; color: #3b82f6">1,234</div>
+                  <div style="color: #94a3b8">Active Users</div>
+                </div>
+                <div
+                  style="background: #1e293b; padding: 1rem; border-radius: 8px; text-align: center"
+                >
+                  <div style="font-size: 2rem; font-weight: bold; color: #10b981">98.5%</div>
+                  <div style="color: #94a3b8">Uptime</div>
+                </div>
+                <div
+                  style="background: #1e293b; padding: 1rem; border-radius: 8px; text-align: center"
+                >
+                  <div style="font-size: 2rem; font-weight: bold; color: #f59e0b">42ms</div>
+                  <div style="color: #94a3b8">Response Time</div>
+                </div>
+              </div>
+            </div>
+
+            <div class="demo-component">
+              <h3>Form Component</h3>
+              <form style="max-width: 400px; margin: 0 auto; text-align: left">
+                <div style="margin-bottom: 1rem">
+                  <label style="display: block; margin-bottom: 0.5rem; color: #e2e8f0"
+                    >Email Address</label
+                  >
+                  <input
+                    type="email"
+                    style="
+                      width: 100%;
+                      padding: 0.75rem;
+                      background: #0f172a;
+                      border: 1px solid #334155;
+                      border-radius: 6px;
+                      color: #e2e8f0;
+                    "
+                  />
+                </div>
+                <div style="margin-bottom: 1rem">
+                  <label style="display: block; margin-bottom: 0.5rem; color: #e2e8f0"
+                    >Password</label
+                  >
+                  <input
+                    type="password"
+                    style="
+                      width: 100%;
+                      padding: 0.75rem;
+                      background: #0f172a;
+                      border: 1px solid #334155;
+                      border-radius: 6px;
+                      color: #e2e8f0;
+                    "
+                  />
+                </div>
+                <button
+                  type="submit"
+                  style="
+                    width: 100%;
+                    background: #3b82f6;
+                    color: white;
+                    border: none;
+                    padding: 0.75rem;
+                    border-radius: 6px;
+                    font-size: 1rem;
+                    cursor: pointer;
+                  "
+                >
+                  Sign In
+                </button>
+              </form>
+            </div>
+          </section>
+
+          <section id="troubleshooting" style="margin-top: 4rem">
+            <h2>Troubleshooting CORS Issues</h2>
+
+            <div class="alert">
+              <span class="alert-icon">⚠️</span>
+              <div>
+                <strong>Common Issue:</strong> "Access to script blocked by CORS policy"
+                <p style="margin-top: 0.5rem">
+                  This happens when opening HTML files directly (file:// protocol). Use one of these
+                  solutions:
+                </p>
+              </div>
+            </div>
+
+            <h3>Solution 1: Use DGMO's Built-in Server (Recommended)</h3>
+            <div class="code-block">
+              <button class="copy-button" onclick="copyCode(this)">Copy</button>
+              <pre>dgmo visual serve</pre>
+            </div>
+
+            <h3>Solution 2: Use Any HTTP Server</h3>
+            <div class="code-block">
+              <button class="copy-button" onclick="copyCode(this)">Copy</button>
+              <pre>
+# Python
+python -m http.server 8000
+
+# Node.js
+npx http-server
+
+# PHP
+php -S localhost:8000</pre
+              >
+            </div>
+
+            <h3>Solution 3: Download Toolbar Locally</h3>
+            <div class="code-block">
+              <button class="copy-button" onclick="copyCode(this)">Copy</button>
+              <pre>dgmo visual-setup --download-toolbar</pre>
+            </div>
+          </section>
+
+          <section id="advanced" style="margin-top: 4rem">
+            <h2>Advanced Configuration</h2>
+
+            <h3>Custom Port Configuration</h3>
+            <div class="code-block">
+              <button class="copy-button" onclick="copyCode(this)">Copy</button>
+              <pre>
+# Use a specific port for the visual server
+dgmo run --visual --visual-port 5750 "your prompt"
+
+# Start on a different port range
+dgmo visual serve --port 8080 --visual-port 5755</pre
+              >
+            </div>
+
+            <h3>Framework-Specific Setup</h3>
+            <div class="code-block">
+              <button class="copy-button" onclick="copyCode(this)">Copy</button>
+              <pre>
+# Auto-detect and setup for your framework
+dgmo visual-setup
+
+# Specify framework explicitly
+dgmo visual-setup --framework react
+dgmo visual-setup --framework vue --inject</pre
+              >
+            </div>
+
+            <h3>Integration with Build Tools</h3>
+            <div class="code-block">
+              <button class="copy-button" onclick="copyCode(this)">Copy</button>
+              <pre>
+// vite.config.js
+export default {
+  server: {
+    proxy: {
+      '/dgmo-ws': {
+        target: 'ws://localhost:5746',
+        ws: true
+      }
+    }
+  }
+}</pre
+              >
+            </div>
+          </section>
+        </main>
+      </div>
+    </div>
+
+    <script>
+      function copyCode(button) {
+        const codeBlock = button.parentElement.querySelector('pre');
+        const text = codeBlock.textContent;
+
+        navigator.clipboard.writeText(text).then(() => {
+          const originalText = button.textContent;
+          button.textContent = 'Copied!';
+          button.style.background = '#10b981';
+
+          setTimeout(() => {
+            button.textContent = originalText;
+            button.style.background = '#334155';
+          }, 2000);
+        });
+      }
+    </script>
+
+    <!-- Stagewise Toolbar Integration -->
+    <script type="module">
+      if (!document.querySelector('stagewise-toolbar')) {
+        console.log('Initializing Stagewise toolbar for DGMO visual mode...');
+
+        const script = document.createElement('script');
+        script.type = 'module';
+        script.src = 'https://unpkg.com/@stagewise/toolbar@0.4.9/dist/index.js';
+        script.onload = () => {
+          console.log('✅ Stagewise toolbar loaded');
+
+          // Update status indicator
+          const statusDot = document.querySelector('.status-dot');
+          const statusText = document.querySelector('.status-indicator span:last-child');
+          if (statusDot && statusText) {
+            statusDot.style.background = '#3b82f6';
+            statusText.textContent = 'Connecting to DGMO...';
+          }
+        };
+        script.onerror = (e) => {
+          console.error('❌ Failed to load Stagewise toolbar:', e);
+          console.log('💡 Try using dgmo visual serve to avoid CORS issues');
+        };
+        document.head.appendChild(script);
+
+        const link = document.createElement('link');
+        link.rel = 'stylesheet';
+        link.href = 'https://unpkg.com/@stagewise/toolbar@0.4.9/dist/style.css';
+        document.head.appendChild(link);
+
+        setTimeout(() => {
+          const toolbar = document.createElement('stagewise-toolbar');
+          toolbar.setAttribute('framework', 'vanilla');
+          document.body.appendChild(toolbar);
+
+          // Final status update
+          setTimeout(() => {
+            const statusDot = document.querySelector('.status-dot');
+            const statusText = document.querySelector('.status-indicator span:last-child');
+            if (statusDot && statusText) {
+              statusDot.style.background = '#10b981';
+              statusText.textContent = 'Connected to DGMO';
+            }
+          }, 2000);
+        }, 1000);
+      }
+    </script>
+  </body>
+</html>
