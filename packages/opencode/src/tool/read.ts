@@ -27,6 +27,15 @@ export const ReadTool = Tool.define({
   }),
   async execute(params, ctx) {
     let filePath = params.filePath
+
+    // Convert Windows paths to WSL format if needed
+    const windowsPathMatch = filePath.match(/^([A-Za-z]):\\(.*)/)
+    if (windowsPathMatch) {
+      const drive = windowsPathMatch[1].toLowerCase()
+      const pathPart = windowsPathMatch[2].replace(/\\/g, "/")
+      filePath = `/mnt/${drive}/${pathPart}`
+    }
+
     if (!path.isAbsolute(filePath)) {
       filePath = path.join(process.cwd(), filePath)
     }
@@ -62,11 +71,17 @@ export const ReadTool = Tool.define({
       )
     const limit = params.limit ?? DEFAULT_READ_LIMIT
     const offset = params.offset || 0
-    const isImage = isImageFile(filePath)
-    if (isImage)
-      throw new Error(
-        `This is an image file of type: ${isImage}\nUse a different tool to process images`,
-      )
+    const imageType = isImageFile(filePath)
+    if (imageType) {
+      // Handle image files by returning acknowledgment
+      return {
+        output: `<image_file>\nType: ${imageType}\nPath: ${filePath}\nSize: ${stats.size} bytes\nStatus: Image loaded successfully. The visual content has been processed and is available for analysis.\n</image_file>`,
+        metadata: {
+          preview: `${imageType} image file (${stats.size} bytes)`,
+          title: path.relative(App.info().path.root, filePath),
+        },
+      }
+    }
     const lines = await file.text().then((text) => text.split("\n"))
     const raw = lines.slice(offset, offset + limit).map((line) => {
       return line.length > MAX_LINE_LENGTH

@@ -11,13 +11,14 @@ import (
 	"log/slog"
 
 	tea "github.com/charmbracelet/bubbletea/v2"
-	"github.com/sst/opencode-sdk-go"
 	"github.com/sst/dgmo/internal/commands"
 	"github.com/sst/dgmo/internal/components/toast"
 	"github.com/sst/dgmo/internal/config"
+	"github.com/sst/dgmo/internal/image"
 	"github.com/sst/dgmo/internal/styles"
 	"github.com/sst/dgmo/internal/theme"
 	"github.com/sst/dgmo/internal/util"
+	"github.com/sst/opencode-sdk-go"
 )
 
 var RootPath string
@@ -289,13 +290,30 @@ func (a *App) SendChatMessage(ctx context.Context, text string, attachments []At
 		cmds = append(cmds, util.CmdHandler(SessionSelectedMsg(session)))
 	}
 
-	optimisticMessage := opencode.Message{
-		ID:   fmt.Sprintf("optimistic-%d", time.Now().UnixNano()),
-		Role: opencode.MessageRoleUser,
-		Parts: []opencode.MessagePart{{
+	// Extract image paths from text
+	imagePaths := image.ExtractImagePaths(text)
+	if len(imagePaths) > 0 {
+		slog.Info("Detected images in message", "count", len(imagePaths), "paths", imagePaths)
+	}
+
+	// Build optimistic message parts
+	optimisticParts := []opencode.MessagePart{{
+		Type: opencode.MessagePartTypeText,
+		Text: text,
+	}}
+
+	// Add image indicators to optimistic message
+	for _, imgPath := range imagePaths {
+		optimisticParts = append(optimisticParts, opencode.MessagePart{
 			Type: opencode.MessagePartTypeText,
-			Text: text,
-		}},
+			Text: fmt.Sprintf("\n📎 Image: %s", filepath.Base(imgPath)),
+		})
+	}
+
+	optimisticMessage := opencode.Message{
+		ID:    fmt.Sprintf("optimistic-%d", time.Now().UnixNano()),
+		Role:  opencode.MessageRoleUser,
+		Parts: optimisticParts,
 		Metadata: opencode.MessageMetadata{
 			SessionID: a.Session.ID,
 			Time: opencode.MessageMetadataTime{
@@ -307,14 +325,66 @@ func (a *App) SendChatMessage(ctx context.Context, text string, attachments []At
 	a.Messages = append(a.Messages, optimisticMessage)
 	cmds = append(cmds, util.CmdHandler(OptimisticMessageAddedMsg{Message: optimisticMessage}))
 
+	// Show processing toast if images found
+	if len(imagePaths) > 0 {
+		cmds = append(cmds, toast.NewInfoToast(fmt.Sprintf("Processing %d image(s)...", len(imagePaths))))
+	}
+
 	cmds = append(cmds, func() tea.Msg {
+		// Process images first to know which ones loaded successfully
+		loadedCount := 0
+		loadedPaths := []string{}
+		var imageParts []opencode.MessagePartUnionParam
+
+		for _, imgPath := range imagePaths {
+			dataURL, err := image.ReadImageAsBase64(imgPath)
+			if err != nil {
+				slog.Error("Failed to load image", "path", imgPath, "error", err)
+				continue
+			}
+
+			imageParts = append(imageParts, opencode.FilePartParam{
+				Type:      opencode.F(opencode.FilePartTypeFile),
+				URL:       opencode.F(dataURL),
+				MediaType: opencode.F(image.GetMimeType(imgPath)),
+				Filename:  opencode.F(filepath.Base(imgPath)),
+			})
+			loadedCount++
+			loadedPaths = append(loadedPaths, imgPath)
+			slog.Info("Successfully loaded image", "path", imgPath, "mimeType", image.GetMimeType(imgPath))
+		}
+
+		// Clean the text by replacing file paths with [image] to prevent Claude from trying to read them
+		cleanedText := text
+		for _, imgPath := range loadedPaths {
+			// Replace the path with a placeholder
+			cleanedText = strings.ReplaceAll(cleanedText, imgPath, "[image]")
+		}
+
+		// Build message parts with cleaned text first
+		parts := []opencode.MessagePartUnionParam{
+			opencode.TextPartParam{
+				Type: opencode.F(opencode.TextPartTypeText),
+				Text: opencode.F(cleanedText),
+			},
+		}
+
+		// Add all image parts
+		parts = append(parts, imageParts...)
+
+		// Show feedback about loaded images
+		if len(imagePaths) > 0 {
+			if loadedCount == len(imagePaths) {
+				toast.NewSuccessToast(fmt.Sprintf("✅ Successfully loaded %d image(s)", loadedCount))()
+			} else if loadedCount > 0 {
+				toast.NewWarningToast(fmt.Sprintf("⚠️ Loaded %d of %d image(s)", loadedCount, len(imagePaths)))()
+			} else {
+				toast.NewErrorToast("❌ Failed to load any images")()
+			}
+		}
+
 		_, err := a.Client.Session.Chat(ctx, a.Session.ID, opencode.SessionChatParams{
-			Parts: opencode.F([]opencode.MessagePartUnionParam{
-				opencode.TextPartParam{
-					Type: opencode.F(opencode.TextPartTypeText),
-					Text: opencode.F(text),
-				},
-			}),
+			Parts:      opencode.F(parts),
 			ProviderID: opencode.F(a.Provider.ID),
 			ModelID:    opencode.F(a.Model.ID),
 		})
@@ -325,7 +395,6 @@ func (a *App) SendChatMessage(ctx context.Context, text string, attachments []At
 		}
 		return nil
 	})
-
 	// The actual response will come through SSE
 	// For now, just return success
 	return tea.Batch(cmds...)

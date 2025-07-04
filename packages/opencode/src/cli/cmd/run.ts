@@ -8,7 +8,7 @@ import { cmd } from "./cmd"
 import { Flag } from "../../flag/flag"
 import { Config } from "../../config/config"
 import { bootstrap } from "../bootstrap"
-
+import { processImagesInText } from "../../util/image-handler"
 const TOOL: Record<string, [string, string]> = {
   todowrite: ["Todo", UI.Style.TEXT_WARNING_BOLD],
   todoread: ["Todo", UI.Style.TEXT_WARNING_BOLD],
@@ -82,7 +82,12 @@ export const RunCommand = cmd({
       UI.empty()
 
       const cfg = await Config.get()
-      if (cfg.autoshare || Flag.DGMO_AUTO_SHARE || Flag.OPENCODE_AUTO_SHARE || args.share) {
+      if (
+        cfg.autoshare ||
+        Flag.DGMO_AUTO_SHARE ||
+        Flag.OPENCODE_AUTO_SHARE ||
+        args.share
+      ) {
         await Session.share(session.id)
         UI.println(
           UI.Style.TEXT_INFO_BOLD +
@@ -141,16 +146,36 @@ export const RunCommand = cmd({
         }
       })
 
+      // Process images in the message
+      const { text, images } = await processImagesInText(message)
+
+      // Build message parts
+      const parts: Message.MessagePart[] = [
+        {
+          type: "text",
+          text: text,
+        },
+      ]
+
+      // Add image parts if any were found
+      for (const image of images) {
+        UI.println(UI.Style.TEXT_SUCCESS + "✅", `Loaded image: ${image.path}`)
+        parts.push({
+          type: "file",
+          mediaType: image.mimeType,
+          filename:
+            image.path.split("/").pop() ||
+            image.path.split("\\").pop() ||
+            "image",
+          url: image.dataUrl,
+        })
+      }
+
       const result = await Session.chat({
         sessionID: session.id,
         providerID,
         modelID,
-        parts: [
-          {
-            type: "text",
-            text: message,
-          },
-        ],
+        parts,
       })
 
       if (isPiped) {
