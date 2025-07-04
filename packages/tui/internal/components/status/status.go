@@ -39,13 +39,14 @@ func (m statusComponent) logo() string {
 	base := styles.NewStyle().Foreground(t.TextMuted()).Background(t.BackgroundElement()).Render
 	emphasis := styles.NewStyle().Foreground(t.Text()).Background(t.BackgroundElement()).Bold(true).Render
 
-	dgm := base("dgm")
-	o := emphasis("o ")
+	dgm := base("DGM")
+	hyphen := base("-")
+	o := emphasis("O ")
 	version := base(m.app.Version)
 	return styles.NewStyle().
 		Background(t.BackgroundElement()).
 		Padding(0, 1).
-		Render(dgm + o + version)
+		Render(dgm + hyphen + o + version)
 }
 
 func formatTokensAndCost(tokens float64, contextWindow float64, cost float64) string {

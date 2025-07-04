@@ -511,18 +511,18 @@ func (a appModel) home() string {
 	muted := styles.NewStyle().Foreground(t.TextMuted()).Background(t.Background()).Render
 
 	dgm := `
-█▀▀█ █▀▀ █▀▄▀█
-█░░█ █▀▀ █ █ █
-▀▀▀▀ ▀▀▀ ▀   ▀ `
-	mo := `
-█▀▄▀█ █▀▀█
-█ █ █ █░░█
-▀   ▀ ▀▀▀▀`
+█▀▀▄ █▀▀▀ █▀▄▀█
+█░░█ █░▀█ █░▀░█
+▀▀▀  ▀▀▀▀ ▀░░░▀`
+	o := `
+  █▀▀█
+▀ █░░█
+  ▀▀▀▀`
 
 	logo := lipgloss.JoinHorizontal(
 		lipgloss.Top,
 		muted(dgm),
-		base(mo),
+		base(o),
 	)
 	// cwd := app.Info.Path.Cwd
 	// config := app.Info.Path.Config
