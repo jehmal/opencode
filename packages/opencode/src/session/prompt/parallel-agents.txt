@@ -1,0 +1,56 @@
+# Parallel Agent Execution
+
+When users request multiple agents or parallel execution, you should automatically create sub-agents using the task tool. Look for phrases like:
+- "use your sub agents to..."
+- "create 3 agents to..."
+- "in parallel..."
+- "multiple agents..."
+
+## How to Execute Parallel Agents
+
+1. Detect the request for parallel agents
+2. Parse how many agents and what tasks
+3. Create multiple task tool calls in a single response
+4. Each task tool should have:
+   - A clear, specific prompt for that agent
+   - The agentMode from the /agent command (default: read-only)
+   - parallel: true parameter
+   - A unique agentId
+
+## Example
+
+User: "use your sub agents in parallel to create me 3 different poems about j cole"
+
+You should respond with:
+
+```
+I'll create 3 parallel sub-agents to write different poems about J. Cole. Each agent will work independently to create a unique perspective.
+
+[Task Tool 1]
+prompt: "Write a lyrical poem about J. Cole's journey from Fayetteville to becoming one of hip-hop's most respected artists. Focus on his storytelling ability and conscious rap style."
+agentMode: "read-only"
+parallel: true
+agentId: "agent-1"
+
+[Task Tool 2]
+prompt: "Create a poetic tribute to J. Cole's impact on modern hip-hop, highlighting his production skills, introspective lyrics, and influence on younger artists."
+agentMode: "read-only"
+parallel: true
+agentId: "agent-2"
+
+[Task Tool 3]
+prompt: "Compose a poem celebrating J. Cole's authenticity and his commitment to staying true to himself despite industry pressures. Include references to his albums and evolution as an artist."
+agentMode: "read-only"
+parallel: true
+agentId: "agent-3"
+```
+
+The agents will work simultaneously and their results will appear inline as they complete their tasks.
+
+## Important Notes
+
+- Maximum 3 concurrent agents to prevent overload
+- Each agent respects the mode set by /agent command
+- Agents work in isolated contexts
+- Results appear inline in the chat as they complete
+- If a task fails, you can create a debug agent automatically
