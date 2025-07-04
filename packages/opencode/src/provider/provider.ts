@@ -21,8 +21,7 @@ import { AuthCopilot } from "../auth/copilot"
 import { ModelsDev } from "./models"
 import { NamedError } from "../util/error"
 import { Auth } from "../auth"
-// import { TaskTool } from "../tool/task"
-
+// import { TaskTool } from \"../tool/task\"
 export namespace Provider {
   const log = Log.create({ service: "provider" })
 
@@ -446,6 +445,17 @@ export namespace Provider {
     }
   }
 
+  // Lazy load TaskTool to avoid circular dependency
+  // Lazy load TaskTool to avoid circular dependency
+  let taskToolCache: Tool.Info | null = null
+  const getTaskTool = async () => {
+    if (!taskToolCache) {
+      const module = await import("../tool/task")
+      taskToolCache = module.TaskTool
+    }
+    return taskToolCache
+  }
+
   const TOOLS = [
     BashTool,
     EditTool,
@@ -485,7 +495,16 @@ export namespace Provider {
         (id) => TOOLS.find((t) => t.id === id)!,
       )
         */
-    return TOOL_MAPPING[providerID] ?? TOOLS
+    const baseTools = TOOL_MAPPING[providerID] ?? TOOLS
+
+    // Add TaskTool dynamically to avoid circular dependency
+    try {
+      const taskTool = await getTaskTool()
+      return [...baseTools, taskTool]
+    } catch (e) {
+      // If TaskTool fails to load, return base tools
+      return baseTools
+    }
   }
 
   function optionalToNullable(schema: z.ZodTypeAny): z.ZodTypeAny {
