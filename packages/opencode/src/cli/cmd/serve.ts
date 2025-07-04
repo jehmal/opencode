@@ -3,7 +3,7 @@ import { Provider } from "../../provider/provider"
 import { Server } from "../../server/server"
 import { Share } from "../../share/share"
 import { cmd } from "./cmd"
-
+import { taskEventServer } from "../../events/task-events/server"
 export const ServeCommand = cmd({
   command: "serve",
   builder: (yargs) =>
@@ -38,8 +38,14 @@ export const ServeCommand = cmd({
         hostname,
       })
 
+      // Start WebSocket server for task events
+      taskEventServer.start()
+
       console.log(
         `opencode server listening on http://${server.hostname}:${server.port}`,
+      )
+      console.log(
+        `Task event WebSocket server listening on ws://localhost:5747`,
       )
 
       await new Promise(() => {})

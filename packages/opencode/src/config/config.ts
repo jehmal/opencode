@@ -222,12 +222,16 @@ export namespace Config {
         })
         .optional()
         .describe("Performance tracking configuration"),
+      agentMode: z
+        .enum(["read-only", "all-tools"])
+        .optional()
+        .default("read-only")
+        .describe("Default mode for sub-agents (read-only or all-tools)"),
     })
     .strict()
     .openapi({
       ref: "Config",
     })
-
   export type Info = z.output<typeof Info>
 
   export const global = lazy(async () => {

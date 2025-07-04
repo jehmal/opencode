@@ -12,7 +12,6 @@ import (
 	tea "github.com/charmbracelet/bubbletea/v2"
 	"github.com/charmbracelet/lipgloss/v2"
 
-	"github.com/sst/opencode-sdk-go"
 	"github.com/sst/dgmo/internal/app"
 	"github.com/sst/dgmo/internal/commands"
 	"github.com/sst/dgmo/internal/completions"
@@ -26,6 +25,7 @@ import (
 	"github.com/sst/dgmo/internal/styles"
 	"github.com/sst/dgmo/internal/theme"
 	"github.com/sst/dgmo/internal/util"
+	"github.com/sst/opencode-sdk-go"
 )
 
 // InterruptDebounceTimeoutMsg is sent when the interrupt key debounce timeout expires
@@ -236,7 +236,14 @@ func (a appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return a, util.CmdHandler(commands.ExecuteCommandsMsg(matches))
 		}
 
-		// 7. Fallback to editor. This is for other characters
+		// 7. Handle Ctrl+B for returning to parent session
+		if keyString == "ctrl+b" && a.app.Session != nil {
+			// Check if current session has a parent
+			// For now, just show a toast since we need to implement parent tracking
+			return a, toast.NewInfoToast("Ctrl+B: Return to parent session (not yet implemented)")
+		}
+
+		// 8. Fallback to editor. This is for other characters
 		// like backspace, tab, etc.
 		updatedEditor, cmd := a.editor.Update(msg)
 		a.editor = updatedEditor.(chat.EditorComponent)
@@ -639,6 +646,9 @@ func (a appModel) executeCommand(command commands.Command) (tea.Model, tea.Cmd) 
 	case commands.SessionListCommand:
 		sessionDialog := dialog.NewSessionDialog(a.app)
 		a.modal = sessionDialog
+	case commands.SubSessionCommand:
+		subSessionDialog := dialog.NewSubSessionDialog(a.app)
+		a.modal = subSessionDialog
 	case commands.SessionShareCommand:
 		if a.app.Session.ID == "" {
 			return a, nil
@@ -673,6 +683,9 @@ func (a appModel) executeCommand(command commands.Command) (tea.Model, tea.Cmd) 
 	case commands.ModelListCommand:
 		modelDialog := dialog.NewModelDialog(a.app)
 		a.modal = modelDialog
+	case commands.AgentModeCommand:
+		agentDialog := dialog.NewAgentDialog(a.app)
+		a.modal = agentDialog
 	case commands.ThemeListCommand:
 		themeDialog := dialog.NewThemeDialog()
 		a.modal = themeDialog

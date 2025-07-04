@@ -36,7 +36,7 @@ import { Config } from "../config/config"
 import { ProviderTransform } from "../provider/transform"
 import { SessionPerformance } from "./performance"
 import { PerformanceWrapper } from "../tool/performance-wrapper"
-
+import { AgentConfig } from "../config/agent-config"
 export namespace Session {
   const log = Log.create({ service: "session" })
 
@@ -118,7 +118,7 @@ export namespace Session {
             controller.abort()
           }
         } catch (e) {
-          log.error("Cleanup error", e)
+          log.error("Cleanup error", { error: e })
         }
       }
     },
@@ -261,7 +261,7 @@ export namespace Session {
       await Storage.removeDir(`session/message/${sessionID}/`).catch(() => {})
       state().sessions.delete(sessionID)
       state().messages.delete(sessionID)
-      
+
       // Save and clean up performance data
       const config = await Config.get()
       if (config.performance?.enabled && config.performance?.saveReports) {
@@ -271,7 +271,7 @@ export namespace Session {
         }
       }
       SessionPerformance.remove(sessionID)
-      
+
       if (emitEvent) {
         Bus.publish(Event.Deleted, {
           info: session,
@@ -417,16 +417,35 @@ export namespace Session {
     }
     await updateMessage(next)
     const tools: Record<string, AITool> = {}
-    
+
+    // Get session info to check if this is a sub-agent
+    const sessionInfo = await get(input.sessionID)
+    const parentId = sessionInfo.parentID
+
     // Get performance tracker for this session
     const performanceTracker = SessionPerformance.getTracker(input.sessionID)
-    
+
     // Wrap provider tools with performance tracking
     const providerTools = await Provider.tools(input.providerID)
-    const wrappedTools = PerformanceWrapper.wrapAll(providerTools, performanceTracker)
+    const wrappedTools = PerformanceWrapper.wrapAll(
+      providerTools,
+      performanceTracker,
+    )
 
     for (const item of wrappedTools) {
-      tools[item.id.replaceAll(".", "_")] = tool({
+      // Check if tool is allowed for this session
+      const toolName = item.id.replaceAll(".", "_")
+      const isAllowed = await AgentConfig.isToolAllowed(
+        input.sessionID,
+        toolName,
+        parentId,
+      )
+
+      if (!isAllowed) {
+        continue // Skip tools that aren't allowed
+      }
+
+      tools[toolName] = tool({
         id: item.id as any,
         description: item.description,
         parameters: item.parameters as ZodSchema,

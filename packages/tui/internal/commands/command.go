@@ -81,6 +81,8 @@ const (
 	ModelListCommand            CommandName = "model_list"
 	ThemeListCommand            CommandName = "theme_list"
 	ProjectInitCommand          CommandName = "project_init"
+	AgentModeCommand            CommandName = "agent_mode"
+	SubSessionCommand           CommandName = "sub_session"
 	InputClearCommand           CommandName = "input_clear"
 	InputPasteCommand           CommandName = "input_paste"
 	InputSubmitCommand          CommandName = "input_submit"
@@ -191,11 +193,22 @@ func LoadFromConfig(config *opencode.Config) CommandRegistry {
 			Trigger:     "init",
 		},
 		{
+			Name:        AgentModeCommand,
+			Description: "set agent mode (read-only/all-tools)",
+			Keybindings: parseBindings("<leader>a"),
+			Trigger:     "agent",
+		},
+		{
+			Name:        SubSessionCommand,
+			Description: "navigate sub-sessions",
+			Keybindings: parseBindings("<leader>u"),
+			Trigger:     "sub-session",
+		},
+		{
 			Name:        InputClearCommand,
 			Description: "clear input",
 			Keybindings: parseBindings("ctrl+c"),
-		},
-		{
+		}, {
 			Name:        InputPasteCommand,
 			Description: "paste content",
 			Keybindings: parseBindings("ctrl+v"),
