@@ -1,0 +1,159 @@
+# CRITICAL: Parallel Agent Execution Instructions
+
+## Overview
+When users request parallel agents, you MUST use the task tool to create REAL sub-agents that execute concurrently. This is NOT a simulation - these are actual sub-sessions that run in parallel.
+
+## Detection Patterns
+Recognize these patterns as requests for parallel agents:
+- "use your sub agents to..."
+- "create [number] agents to..."
+- "in parallel..."
+- "multiple agents..."
+- "simultaneously..."
+- "concurrently..."
+
+## CORRECT Implementation
+
+### Step 1: Brief Acknowledgment
+Start with a short message acknowledging the request.
+
+### Step 2: Multiple Task Tool Calls in ONE Message
+Create ALL task tool invocations in a SINGLE message to ensure parallel execution.
+
+### Step 3: Required Parameters for Each Task Tool
+- `description`: Short 3-5 word task identifier
+- `prompt`: Detailed, specific instructions for that agent
+- `agentMode`: "read-only" or "all-tools" (optional, defaults to "read-only")
+
+## Complete Example
+
+### User Request:
+"create me 3 poems about big sean using 3 sub agents"
+
+### CORRECT Response:
+
+I'll create 3 parallel sub-agents to write poems about Big Sean. Each agent will focus on a different aspect of his artistry.
+
+<function_calls>
+<invoke name="task">
+<parameter name="description">Journey poem</parameter>
+<parameter name="prompt">Write a narrative poem about Big Sean's journey from Detroit to stardom. Focus on:
+- His humble beginnings in Detroit
+- Meeting Kanye West at the radio station
+- His rise through mixtapes to mainstream success
+- The perseverance and dedication it took
+- His connection to his hometown
+Make it inspirational and use vivid imagery. The poem should be 16-20 lines with a strong rhythm.</parameter>
+<parameter name="agentMode">read-only</parameter>
+</invoke>
+<invoke name="task">
+<parameter name="description">Style poem</parameter>
+<parameter name="prompt">Write a lyrical poem capturing Big Sean's unique rap style and wordplay. Focus on:
+- His signature ad-libs ("Oh God", "Swerve", "Boi")
+- His clever wordplay and punchlines
+- His flow switches and cadence changes
+- References to some of his hit songs
+- His confidence and braggadocious style
+Make it rhythmic and playful, mimicking his rap style. The poem should be 16-20 lines with internal rhymes.</parameter>
+<parameter name="agentMode">read-only</parameter>
+</invoke>
+<invoke name="task">
+<parameter name="description">Legacy poem</parameter>
+<parameter name="prompt">Write a reflective poem about Big Sean's impact and legacy in hip-hop. Focus on:
+- His influence on younger artists
+- His mental health advocacy
+- His business ventures and entrepreneurship
+- His growth as an artist over the years
+- His place in hip-hop history
+Make it thoughtful and contemplative. The poem should be 16-20 lines with a philosophical tone.</parameter>
+<parameter name="agentMode">read-only</parameter>
+</invoke>
+</function_calls>
+
+## What NOT to Do (INCORRECT Implementations)
+
+### ❌ DO NOT simulate with bash/echo:
+```bash
+echo "Creating 3 agents..."
+echo "Agent 1: Writing journey poem..."
+```
+
+### ❌ DO NOT use write tool to fake outputs:
+```
+write("/tmp/poem1.txt", "Fake poem content...")
+```
+
+### ❌ DO NOT make sequential task calls:
+```
+# First message
+<invoke name="task">...agent 1...</invoke>
+
+# Second message  
+<invoke name="task">...agent 2...</invoke>
+```
+
+## Key Points to Remember
+
+1. **Real Execution**: The task tool creates actual sub-sessions that run in parallel
+2. **Single Message**: ALL task invocations must be in ONE message for parallelism
+3. **Detailed Prompts**: Each agent needs specific, detailed instructions
+4. **Progress Display**: The UI will show "Agent 1: [current activity]" in real-time
+5. **Persistence**: Sub-sessions are stored and accessible via /sub-session command
+6. **Tool Filtering**: Sub-agents respect agentMode (read-only can't write/edit/bash)
+7. **Auto-Debug**: Failed agents automatically spawn debug agents if enabled
+
+## Advanced Example: Complex Task Delegation
+
+### User Request:
+"use your sub agents to analyze this codebase and find all security vulnerabilities"
+
+### CORRECT Response:
+
+I'll deploy 3 specialized sub-agents to analyze different aspects of the codebase for security vulnerabilities.
+
+<function_calls>
+<invoke name="task">
+<parameter name="description">Auth analysis</parameter>
+<parameter name="prompt">Analyze the authentication and authorization systems in this codebase for security vulnerabilities. Focus on:
+- Password handling and storage
+- Session management
+- Token generation and validation
+- Access control implementations
+- Authentication bypass possibilities
+Use grep to find auth-related files, then read and analyze them. Report any vulnerabilities found with severity levels.</parameter>
+<parameter name="agentMode">read-only</parameter>
+</invoke>
+<invoke name="task">
+<parameter name="description">Input validation</parameter>
+<parameter name="prompt">Search for input validation vulnerabilities throughout the codebase. Look for:
+- SQL injection risks
+- XSS vulnerabilities
+- Command injection possibilities
+- Path traversal vulnerabilities
+- Unsafe deserialization
+Search for database queries, user input handling, and external command execution. Report findings with code locations.</parameter>
+<parameter name="agentMode">read-only</parameter>
+</invoke>
+<invoke name="task">
+<parameter name="description">Dependencies audit</parameter>
+<parameter name="prompt">Audit third-party dependencies and configuration for security issues. Check:
+- Package.json/requirements.txt for outdated packages
+- Known vulnerabilities in dependencies
+- Insecure configuration files
+- Exposed secrets or API keys
+- CORS and security header configurations
+Report all findings with recommendations for fixes.</parameter>
+<parameter name="agentMode">read-only</parameter>
+</invoke>
+</function_calls>
+
+## Integration with Other Features
+
+1. **Sub-Session Storage**: Each agent creates a stored sub-session
+2. **WebSocket Updates**: Real-time progress appears in the chat
+3. **Navigation**: Use /sub-session to view any agent's full history
+4. **Failure Handling**: Automatic debug agents spawn on errors
+5. **Context Isolation**: Each agent has its own context
+6. **Result Aggregation**: Main DGMO receives all results for synthesis
+
+Remember: This is the ONLY correct way to handle parallel agent requests. Any simulation or fake implementation is incorrect and defeats the purpose of the parallel agent system.

@@ -32,6 +32,9 @@ export namespace AgentConfig {
     "bash",
     "patch",
     "multiedit",
+    "task",
+    "todowrite",
+    "todoread",
     // All other tools
   ]
 

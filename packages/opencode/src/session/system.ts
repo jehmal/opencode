@@ -9,7 +9,7 @@ import PROMPT_ANTHROPIC from "./prompt/anthropic.txt"
 import PROMPT_ANTHROPIC_SPOOF from "./prompt/anthropic_spoof.txt"
 import PROMPT_SUMMARIZE from "./prompt/summarize.txt"
 import PROMPT_TITLE from "./prompt/title.txt"
-
+import PROMPT_PARALLEL_AGENTS from "./prompt/parallel-agents-detailed.txt"
 export namespace SystemPrompt {
   export function provider(providerID: string) {
     const result = []
@@ -17,9 +17,11 @@ export namespace SystemPrompt {
       case "anthropic":
         result.push(PROMPT_ANTHROPIC_SPOOF.trim())
         result.push(PROMPT_ANTHROPIC)
+        result.push(PROMPT_PARALLEL_AGENTS)
         break
       default:
         result.push(PROMPT_ANTHROPIC)
+        result.push(PROMPT_PARALLEL_AGENTS)
         break
     }
     return result
