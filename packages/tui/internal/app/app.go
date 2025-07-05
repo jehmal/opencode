@@ -36,6 +36,11 @@ type App struct {
 	Session   *opencode.Session
 	Messages  []opencode.Message
 	Commands  commands.CommandRegistry
+
+	// Session navigation state
+	SessionStack         []string // Stack of session IDs for navigation history
+	CurrentSessionType   string   // "main" or "sub"
+	LastViewedSubSession string   // Track last viewed sub-session for quick access
 }
 
 type SessionSelectedMsg = *opencode.Session
@@ -54,6 +59,19 @@ type CompletionDialogTriggeredMsg struct {
 }
 type OptimisticMessageAddedMsg struct {
 	Message opencode.Message
+}
+
+// Session navigation messages
+type SessionSwitchedMsg struct {
+	SessionID string
+	Session   *opencode.Session
+	Messages  []opencode.Message
+}
+
+type NavigateBackMsg struct{}
+
+type NavigateToSiblingMsg struct {
+	Direction string // "next" or "prev"
 }
 
 func New(
@@ -116,12 +134,15 @@ func New(
 		Version:   version,
 		StatePath: appStatePath,
 		Config:    configInfo,
-		State:     appState,
 		Client:    httpClient,
-		Session:   &opencode.Session{},
-		Messages:  []opencode.Message{},
+		State:     appState,
 		Commands:  commands.LoadFromConfig(configInfo),
 	}
+
+	// Initialize navigation state
+	// Note: Session is not loaded yet at this point, will be set later
+	app.CurrentSessionType = "main" // Default to main
+	app.SessionStack = []string{}
 
 	return app, nil
 }
@@ -281,7 +302,7 @@ func (a *App) CreateSession(ctx context.Context) (*opencode.Session, error) {
 
 func (a *App) SendChatMessage(ctx context.Context, text string, attachments []Attachment) tea.Cmd {
 	var cmds []tea.Cmd
-	if a.Session.ID == "" {
+	if a.Session == nil || a.Session.ID == "" {
 		session, err := a.CreateSession(ctx)
 		if err != nil {
 			return toast.NewErrorToast(err.Error())
@@ -462,3 +483,85 @@ func (a *App) ListProviders(ctx context.Context) ([]opencode.Provider, error) {
 // func (a *App) loadCustomKeybinds() {
 //
 // }
+
+// Session navigation methods
+
+// PushSession adds a session to the navigation stack
+func (a *App) PushSession(sessionID string) {
+	if a.SessionStack == nil {
+		a.SessionStack = []string{}
+	}
+	// Avoid duplicates at the top
+	if len(a.SessionStack) > 0 && a.SessionStack[len(a.SessionStack)-1] == sessionID {
+		return
+	}
+	a.SessionStack = append(a.SessionStack, sessionID)
+}
+
+// PopSession removes and returns the last session from the stack
+func (a *App) PopSession() string {
+	if len(a.SessionStack) == 0 {
+		return ""
+	}
+	sessionID := a.SessionStack[len(a.SessionStack)-1]
+	a.SessionStack = a.SessionStack[:len(a.SessionStack)-1]
+	return sessionID
+}
+
+// LoadSession loads a session and its messages
+func (a *App) LoadSession(ctx context.Context, sessionID string) (*opencode.Session, []opencode.Message, error) {
+	// Get all sessions and find the one we want
+	sessions, err := a.ListSessions(ctx)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to list sessions: %w", err)
+	}
+
+	var session *opencode.Session
+	for _, s := range sessions {
+		if s.ID == sessionID {
+			session = &s
+			break
+		}
+	}
+
+	if session == nil {
+		return nil, nil, fmt.Errorf("session not found: %s", sessionID)
+	}
+
+	// Get messages
+	messages, err := a.ListMessages(ctx, sessionID)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to get messages: %w", err)
+	}
+
+	return session, messages, nil
+}
+
+// SwitchToSession switches the current session context
+func (a *App) SwitchToSession(ctx context.Context, sessionID string) tea.Cmd {
+	return func() tea.Msg {
+		session, messages, err := a.LoadSession(ctx, sessionID)
+		if err != nil {
+			return toast.NewErrorToast(fmt.Sprintf("Failed to load session: %v", err))
+		}
+
+		// Track navigation
+		if a.Session != nil {
+			a.PushSession(a.Session.ID)
+		}
+
+		// Update session type
+		if session.ParentID != "" {
+			a.CurrentSessionType = "sub"
+			a.LastViewedSubSession = sessionID
+		} else {
+			a.CurrentSessionType = "main"
+		}
+
+		return SessionSwitchedMsg{
+			SessionID: sessionID,
+			Session:   session,
+			Messages:  messages,
+		}
+	}
+}

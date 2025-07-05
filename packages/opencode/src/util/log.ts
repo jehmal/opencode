@@ -18,7 +18,11 @@ export namespace Log {
     const dir = path.join(Global.Path.data, "log")
     await fs.mkdir(dir, { recursive: true })
     cleanup(dir)
-    if (options.print) return
+
+    // In production, ALWAYS redirect to file regardless of options
+    const isProduction = process.env["OPENCODE_ENV"] === "production"
+    if (options.print && !isProduction) return
+
     logpath = path.join(
       dir,
       new Date().toISOString().split(".")[0].replace(/:/g, "") + ".log",

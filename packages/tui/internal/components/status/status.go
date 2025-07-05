@@ -78,7 +78,7 @@ func formatTokensAndCost(tokens float64, contextWindow float64, cost float64) st
 
 func (m statusComponent) View() string {
 	t := theme.CurrentTheme()
-	if m.app.Session.ID == "" {
+	if m.app.Session == nil || m.app.Session.ID == "" {
 		return styles.NewStyle().
 			Background(t.Background()).
 			Width(m.width).

@@ -1,3 +1,4 @@
+import { Debug } from "../util/debug"
 import { Tool } from "./tool"
 import DESCRIPTION from "./task.txt"
 import { z } from "zod"
@@ -13,7 +14,7 @@ import {
   emitTaskFailed,
 } from "../events/task-events"
 
-console.log("[TASK-TOOL] TaskTool module loaded at", new Date().toISOString())
+Debug.log("[TASK-TOOL] TaskTool module loaded at", new Date().toISOString())
 
 export const TaskTool = Tool.define({
   id: "task",
@@ -39,25 +40,25 @@ export const TaskTool = Tool.define({
       .describe("Maximum number of automatic retry attempts"),
   }),
   async execute(params, ctx) {
-    console.log("\n=== TASK TOOL EXECUTION STARTED ===")
-    console.log("[TASK] Timestamp:", new Date().toISOString())
-    console.log("[TASK] Task tool executed with params:", params)
-    console.log("[TASK] Context sessionID:", ctx.sessionID)
-    console.log("[TASK] Creating sub-session with parent:", ctx.sessionID)
-    console.log("[TASK] Current working directory:", process.cwd())
+    Debug.log("\n=== TASK TOOL EXECUTION STARTED ===")
+    Debug.log("[TASK] Timestamp:", new Date().toISOString())
+    Debug.log("[TASK] Task tool executed with params:", params)
+    Debug.log("[TASK] Context sessionID:", ctx.sessionID)
+    Debug.log("[TASK] Creating sub-session with parent:", ctx.sessionID)
+    Debug.log("[TASK] Current working directory:", process.cwd())
     
     // Simple debug log to file
     try {
       const { logTaskExecution } = await import("./task-debug")
       logTaskExecution(ctx.sessionID, params.description)
     } catch (e) {
-      console.error("[TASK] Debug log failed:", e)
+      Debug.error("[TASK] Debug log failed:", e)
     }
     
     // Import App to get paths
     const { App } = await import("../app/app")
     const appInfo = App.info()
-    console.log("[TASK] App info paths:", appInfo.path)
+    Debug.log("[TASK] App info paths:", appInfo.path)
 
     // Create a sub-session with the current session as parent
     const subSession = await Session.create(ctx.sessionID)
@@ -76,14 +77,14 @@ export const TaskTool = Tool.define({
         `Agent ${params.description}`,
         params.prompt,
       )
-      console.log("[TASK] SubSession.create completed successfully")
+      Debug.log("[TASK] SubSession.create completed successfully")
       
       // Verification Agent - verify sub-session creation in real-time
       const verificationAgent = async () => {
         await new Promise(resolve => setTimeout(resolve, 100)) // Brief delay for storage
         const { SessionDiagnostics } = await import("../session/diagnostics")
         const verification = await SessionDiagnostics.verifySubSessions(ctx.sessionID)
-        console.log("[VERIFICATION] Sub-session creation result:", {
+        Debug.log("[VERIFICATION] Sub-session creation result:", {
           parentId: ctx.sessionID,
           subSessionId: subSession.id,
           verified: verification.subSessionCount > 0,
@@ -103,9 +104,9 @@ export const TaskTool = Tool.define({
           count: verification.subSessionCount
         })
       }
-      verificationAgent().catch(e => console.error("[VERIFICATION] Error:", e)) // Fire and forget
+      verificationAgent().catch(e => Debug.error("[VERIFICATION] Error:", e)) // Fire and forget
     } catch (error) {
-      console.error("[TASK] SubSession.create failed:", error)
+      Debug.error("[TASK] SubSession.create failed:", error)
       throw error
     }
 

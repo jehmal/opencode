@@ -1,0 +1,8 @@
+#!/bin/bash
+# Production wrapper for dgmo - ensures no debug output
+
+# Set production environment if not already set
+export OPENCODE_ENV="${OPENCODE_ENV:-production}"
+
+# Run the actual dgmo command
+exec dgmo "$@"

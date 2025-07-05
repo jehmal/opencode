@@ -1,3 +1,4 @@
+import { Debug } from "../util/debug"
 import { writeFileSync, appendFileSync, existsSync, mkdirSync } from "fs"
 import { join } from "path"
 
@@ -16,7 +17,7 @@ export function logTaskExecution(sessionId: string, description: string) {
   try {
     appendFileSync(DEBUG_FILE, logEntry)
   } catch (e) {
-    console.error("[TASK-DEBUG] Failed to write log:", e)
+    Debug.error("[TASK-DEBUG] Failed to write log:", e)
   }
 }
 
@@ -27,7 +28,7 @@ export function logSubSessionCreation(parentId: string, subSessionId: string, de
   try {
     appendFileSync(DEBUG_FILE, logEntry)
   } catch (e) {
-    console.error("[TASK-DEBUG] Failed to write log:", e)
+    Debug.error("[TASK-DEBUG] Failed to write log:", e)
   }
 }
 
@@ -37,7 +38,7 @@ export function readDebugLog(): string {
       return Bun.file(DEBUG_FILE).text()
     }
   } catch (e) {
-    console.error("[TASK-DEBUG] Failed to read log:", e)
+    Debug.error("[TASK-DEBUG] Failed to read log:", e)
   }
   return "No debug log found"
 }

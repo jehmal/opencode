@@ -1,3 +1,4 @@
+import { Debug } from "../util/debug"
 import { z } from "zod"
 
 export namespace AgentConfig {
@@ -86,34 +87,15 @@ export namespace AgentConfig {
   ): Promise<string[]> {
     // Main DGMO always has all tools
     const isMain = isMainSession(sessionId, parentId)
-    console.log("[AGENT-CONFIG] getAllowedTools:", {
-      sessionId,
-      parentId,
-      parentIdType: typeof parentId,
-      parentIdTruthy: !!parentId,
-      parentIdLength: typeof parentId === "string" ? parentId.length : "N/A",
-      isMainSession: isMain,
-      willGetAllTools: isMain,
-    })
 
     if (isMain) {
-      console.log(
-        "[AGENT-CONFIG] Main session detected, returning ALL_TOOLS including task",
-      )
       return ALL_TOOLS
     }
 
     // Get session-specific mode or fall back to global
     const mode = getSessionAgentMode(sessionId) || (await getAgentMode())
-    console.log("[AGENT-CONFIG] Session mode:", mode)
 
     const tools = mode === "all-tools" ? ALL_TOOLS : READ_ONLY_TOOLS
-    console.log(
-      "[AGENT-CONFIG] Returning tools:",
-      tools.length,
-      "tools, includes task:",
-      tools.includes("task"),
-    )
     return tools
   }
 
@@ -130,15 +112,6 @@ export namespace AgentConfig {
 
     const allowedTools = await getAllowedTools(sessionId, parentId)
     const isAllowed = allowedTools.includes(toolName)
-    if (toolName === "task") {
-      console.log("[AGENT-CONFIG] isToolAllowed for task:", {
-        sessionId,
-        parentId,
-        allowedToolsCount: allowedTools.length,
-        isAllowed,
-        allowedTools: allowedTools.slice(0, 5) + "...",
-      })
-    }
     return isAllowed
   }
 }

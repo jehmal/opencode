@@ -2,6 +2,7 @@ package tui
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"os"
 	"os/exec"
@@ -56,6 +57,7 @@ type appModel struct {
 	toastManager         *toast.ToastManager
 	interruptKeyState    InterruptKeyState
 	lastScroll           time.Time
+	isCtrlBSequence      bool // Track if Ctrl+B was pressed for multi-key sequences
 }
 
 func (a appModel) Init() tea.Cmd {
@@ -236,11 +238,42 @@ func (a appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return a, util.CmdHandler(commands.ExecuteCommandsMsg(matches))
 		}
 
-		// 7. Handle Ctrl+B for returning to parent session
+		// 7. Handle Ctrl+B sequences
+		if a.isCtrlBSequence {
+			a.isCtrlBSequence = false
+			switch keyString {
+			case ".":
+				// Navigate to next sibling sub-session
+				return a, a.navigateToSibling(context.Background(), "next")
+			case ",":
+				// Navigate to previous sibling sub-session
+				return a, a.navigateToSibling(context.Background(), "prev")
+			default:
+				// Any other key cancels the sequence
+				return a, nil
+			}
+		}
+
 		if keyString == "ctrl+b" && a.app.Session != nil {
-			// Check if current session has a parent
-			// For now, just show a toast since we need to implement parent tracking
-			return a, toast.NewInfoToast("Ctrl+B: Return to parent session (not yet implemented)")
+
+			// Set flag for multi-key sequence
+			a.isCtrlBSequence = true
+			// Also handle immediate navigation
+			// If in sub-session, return to parent
+			if a.app.CurrentSessionType == "sub" && a.app.Session.ParentID != "" {
+				a.isCtrlBSequence = false // Cancel sequence since we're navigating
+
+				return a, a.app.SwitchToSession(context.Background(), a.app.Session.ParentID)
+			}
+			// If in main session and has viewed sub-sessions, go to last viewed
+			if a.app.CurrentSessionType == "main" && a.app.LastViewedSubSession != "" {
+				a.isCtrlBSequence = false // Cancel sequence since we're navigating
+
+				return a, a.app.SwitchToSession(context.Background(), a.app.LastViewedSubSession)
+			}
+			// Otherwise wait for next key (. or ,)
+
+			return a, toast.NewInfoToast("Press . for next or , for previous sibling")
 		}
 
 		// 8. Fallback to editor. This is for other characters
@@ -262,7 +295,7 @@ func (a appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			Background:       msg.Color,
 			BackgroundIsDark: msg.IsDark(),
 		}
-		slog.Debug("Background color", "color", msg.String(), "isDark", msg.IsDark())
+
 		return a, func() tea.Msg {
 			theme.UpdateSystemTheme(
 				styles.Terminal.Background,
@@ -380,6 +413,29 @@ func (a appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		a.app.Session = msg
 		a.app.Messages = messages
+
+		// Update session type when selecting from dialog
+		if msg.ParentID != "" {
+			a.app.CurrentSessionType = "sub"
+			a.app.LastViewedSubSession = msg.ID
+		} else {
+			a.app.CurrentSessionType = "main"
+		}
+
+	case app.SessionSwitchedMsg:
+
+		// Handle session switching from navigation
+		a.app.Session = msg.Session
+		a.app.Messages = msg.Messages
+		// Close any open modal
+		if a.modal != nil {
+			cmd := a.modal.Close()
+			a.modal = nil
+			cmds = append(cmds, cmd)
+		}
+		// Show success toast
+		cmds = append(cmds, toast.NewSuccessToast(fmt.Sprintf("Switched to session: %s", msg.Session.Title)))
+		// Messages will be updated automatically via a.app.Messages
 	case app.ModelSelectedMsg:
 		a.app.Provider = &msg.Provider
 		a.app.Model = &msg.Model
@@ -451,7 +507,7 @@ func (a appModel) chat(width int, align lipgloss.Position) string {
 	editorView := a.editor.View(width, align)
 	lines := a.editor.Lines()
 	messagesView := a.messages.View()
-	if a.app.Session.ID == "" {
+	if a.app.Session == nil || a.app.Session.ID == "" {
 		messagesView = a.home()
 	}
 	editorHeight := max(lines, 5)
@@ -637,7 +693,7 @@ func (a appModel) executeCommand(command commands.Command) (tea.Model, tea.Cmd) 
 		})
 		cmds = append(cmds, cmd)
 	case commands.SessionNewCommand:
-		if a.app.Session.ID == "" {
+		if a.app.Session == nil || a.app.Session.ID == "" {
 			return a, nil
 		}
 		a.app.Session = &opencode.Session{}
@@ -650,7 +706,7 @@ func (a appModel) executeCommand(command commands.Command) (tea.Model, tea.Cmd) 
 		subSessionDialog := dialog.NewSubSessionDialog(a.app)
 		a.modal = subSessionDialog
 	case commands.SessionShareCommand:
-		if a.app.Session.ID == "" {
+		if a.app.Session == nil || a.app.Session.ID == "" {
 			return a, nil
 		}
 		response, err := a.app.Client.Session.Share(context.Background(), a.app.Session.ID)
@@ -662,13 +718,13 @@ func (a appModel) executeCommand(command commands.Command) (tea.Model, tea.Cmd) 
 		cmds = append(cmds, tea.SetClipboard(shareUrl))
 		cmds = append(cmds, toast.NewSuccessToast("Share URL copied to clipboard!"))
 	case commands.SessionInterruptCommand:
-		if a.app.Session.ID == "" {
+		if a.app.Session == nil || a.app.Session.ID == "" {
 			return a, nil
 		}
 		a.app.Cancel(context.Background(), a.app.Session.ID)
 		return a, nil
 	case commands.SessionCompactCommand:
-		if a.app.Session.ID == "" {
+		if a.app.Session == nil || a.app.Session.ID == "" {
 			return a, nil
 		}
 		// TODO: block until compaction is complete
@@ -792,4 +848,57 @@ func NewModel(app *app.App) tea.Model {
 	}
 
 	return model
+}
+
+// navigateToSibling navigates to the next or previous sibling sub-session
+func (a *appModel) navigateToSibling(ctx context.Context, direction string) tea.Cmd {
+	return func() tea.Msg {
+		// Only works if we're in a sub-session
+		if a.app.Session == nil || a.app.Session.ParentID == "" {
+			return toast.NewInfoToast("Not in a sub-session")
+		}
+
+		// Get all siblings
+		endpoint := fmt.Sprintf("/session/%s/sub-sessions", a.app.Session.ParentID)
+		var siblings []map[string]interface{}
+		err := a.app.Client.Get(ctx, endpoint, nil, &siblings)
+		if err != nil {
+			return toast.NewErrorToast(fmt.Sprintf("Failed to get siblings: %v", err))
+		}
+
+		if len(siblings) <= 1 {
+			return toast.NewInfoToast("No sibling sub-sessions")
+		}
+
+		// Find current session index
+		currentIndex := -1
+		for i, sibling := range siblings {
+			if id, ok := sibling["id"].(string); ok && id == a.app.Session.ID {
+				currentIndex = i
+				break
+			}
+		}
+
+		if currentIndex == -1 {
+			return toast.NewErrorToast("Current session not found in siblings")
+		}
+
+		// Calculate next index with wrap-around
+		var nextIndex int
+		if direction == "next" {
+			nextIndex = (currentIndex + 1) % len(siblings)
+		} else {
+			nextIndex = currentIndex - 1
+			if nextIndex < 0 {
+				nextIndex = len(siblings) - 1
+			}
+		}
+
+		// Switch to sibling
+		if nextID, ok := siblings[nextIndex]["id"].(string); ok {
+			return a.app.SwitchToSession(ctx, nextID)()
+		}
+
+		return toast.NewErrorToast("Failed to get sibling ID")
+	}
 }

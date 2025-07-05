@@ -82,7 +82,7 @@ func LoadThemesFromDirectories(userConfig, projectRoot, cwd string) error {
 
 	for _, dir := range dirs {
 		if err := loadThemesFromDirectory(dir); err != nil {
-			fmt.Printf("Warning: Failed to load themes from %s: %v\n", dir, err)
+			// Silently ignore theme loading errors - themes are optional
 		}
 	}
 
@@ -109,13 +109,13 @@ func loadThemesFromDirectory(dir string) error {
 
 		data, err := os.ReadFile(filePath)
 		if err != nil {
-			fmt.Printf("Warning: Failed to read theme file %s: %v\n", filePath, err)
+			// Skip files that can't be read
 			continue
 		}
 
 		theme, err := parseJSONTheme(themeName, data)
 		if err != nil {
-			fmt.Printf("Warning: Failed to parse theme %s: %v\n", filePath, err)
+			// Skip themes that can't be parsed
 			continue
 		}
 

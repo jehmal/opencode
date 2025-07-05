@@ -6,13 +6,13 @@ import (
 	"github.com/charmbracelet/bubbles/v2/viewport"
 	tea "github.com/charmbracelet/bubbletea/v2"
 	"github.com/charmbracelet/lipgloss/v2"
-	"github.com/sst/opencode-sdk-go"
 	"github.com/sst/dgmo/internal/app"
 	"github.com/sst/dgmo/internal/components/dialog"
 	"github.com/sst/dgmo/internal/layout"
 	"github.com/sst/dgmo/internal/styles"
 	"github.com/sst/dgmo/internal/theme"
 	"github.com/sst/dgmo/internal/util"
+	"github.com/sst/opencode-sdk-go"
 )
 
 type MessagesComponent interface {
@@ -75,6 +75,11 @@ func (m *messagesComponent) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.cache.Clear()
 		cmd := m.Reload()
 		return m, cmd
+	case app.SessionSwitchedMsg:
+		// Clear cache and reload when session switches
+		m.cache.Clear()
+		m.tail = true
+		return m, m.Reload()
 	case renderFinishedMsg:
 		m.rendering = false
 		if m.tail {
@@ -258,10 +263,9 @@ func (m *messagesComponent) renderView() {
 }
 
 func (m *messagesComponent) header() string {
-	if m.app.Session.ID == "" {
+	if m.app.Session == nil || m.app.Session.ID == "" {
 		return ""
 	}
-
 	t := theme.CurrentTheme()
 	width := layout.Current.Container.Width
 	base := styles.NewStyle().Foreground(t.Text()).Background(t.Background()).Render

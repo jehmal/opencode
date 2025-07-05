@@ -3,16 +3,17 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"io"
 	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea/v2"
-	"github.com/sst/opencode-sdk-go"
-	"github.com/sst/opencode-sdk-go/option"
 	"github.com/sst/dgmo/internal/app"
 	"github.com/sst/dgmo/internal/tui"
+	"github.com/sst/opencode-sdk-go"
+	"github.com/sst/opencode-sdk-go/option"
 )
 
 var Version = "dev"
@@ -22,6 +23,10 @@ func main() {
 	if version != "dev" && !strings.HasPrefix(Version, "v") {
 		version = "v" + Version
 	}
+
+	// Set up a null logger immediately to prevent any console output
+	nullLogger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	slog.SetDefault(nullLogger)
 
 	url := os.Getenv("DGMO_SERVER")
 
@@ -47,7 +52,7 @@ func main() {
 		os.Exit(1)
 	}
 	defer file.Close()
-	logger := slog.New(slog.NewTextHandler(file, &slog.HandlerOptions{Level: slog.LevelDebug}))
+	logger := slog.New(slog.NewTextHandler(file, &slog.HandlerOptions{Level: slog.LevelInfo}))
 	slog.SetDefault(logger)
 
 	slog.Debug("TUI launched", "app", appInfo)

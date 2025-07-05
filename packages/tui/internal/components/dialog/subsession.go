@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"strings"
 	"time"
-	"log/slog"
 
 	tea "github.com/charmbracelet/bubbletea/v2"
 	"github.com/charmbracelet/lipgloss/v2"
@@ -103,9 +102,8 @@ type subSessionDialog struct {
 }
 
 func (s *subSessionDialog) Init() tea.Cmd {
-	slog.Debug("[SUB-SESSION FIX] Init() called")
-	// Load sub-sessions on init
-	return s.loadSubSessions
+	// Following the sessions dialog pattern - data is loaded in constructor
+	return nil
 }
 
 func (s *subSessionDialog) loadSubSessions() tea.Msg {
@@ -115,44 +113,33 @@ func (s *subSessionDialog) loadSubSessions() tea.Msg {
 		return toast.NewErrorToast("No active session")
 	}
 
-	// Debug logging
-	slog.Debug("[SUB-SESSION FIX] loadSubSessions called", "sessionID", currentSession.ID, "title", currentSession.Title, "parentID", currentSession.ParentID)
-
 	ctx := context.Background()
 	var allSubSessions []map[string]interface{}
-	
+
 	// Strategy 1: Get direct children of current session
 	endpoint := fmt.Sprintf("/session/%s/sub-sessions", currentSession.ID)
 	var directChildren []map[string]interface{}
 	err := s.app.Client.Get(ctx, endpoint, nil, &directChildren)
-	
-	// Enhanced debug logging
-	slog.Debug("[SUB-SESSION FIX] API call result", "endpoint", endpoint, "error", err, "responseLength", len(directChildren))
-	if err == nil && len(directChildren) > 0 {
-		slog.Debug("[SUB-SESSION FIX] First item", "item", directChildren[0])
-	}
+
 	// Also add a visible indicator in the UI
 	if err != nil {
 		return toast.NewErrorToast(fmt.Sprintf("API Error: %v", err))
 	}
-	
+
 	if err == nil && len(directChildren) > 0 {
-		fmt.Printf("[SUB-SESSION FIX] Found %d direct children\n", len(directChildren))
 		for i := range directChildren {
 			directChildren[i]["_displayType"] = "direct-child"
 		}
 		allSubSessions = append(allSubSessions, directChildren...)
 	}
-	
+
 	// Strategy 2: If current session has a parent, get siblings
 	if currentSession.ParentID != "" {
-		fmt.Printf("[SUB-SESSION FIX] Current session has parent: %s\n", currentSession.ParentID)
 		parentEndpoint := fmt.Sprintf("/session/%s/sub-sessions", currentSession.ParentID)
 		var siblings []map[string]interface{}
 		err = s.app.Client.Get(ctx, parentEndpoint, nil, &siblings)
-		
+
 		if err == nil && len(siblings) > 0 {
-			fmt.Printf("[SUB-SESSION FIX] Found %d siblings\n", len(siblings))
 			// Mark siblings and exclude current session
 			for i := range siblings {
 				if siblings[i]["id"] != currentSession.ID {
@@ -163,43 +150,10 @@ func (s *subSessionDialog) loadSubSessions() tea.Msg {
 			}
 		}
 	}
-	
-	// Strategy 3: Always try to get ALL sub-sessions as well
-	fmt.Printf("[SUB-SESSION FIX] Also fetching all sub-sessions for complete view\n")
-	fallbackEndpoint := "/sub-sessions"
-	var allSubs []map[string]interface{}
-	err = s.app.Client.Get(ctx, fallbackEndpoint, nil, &allSubs)
-	
-	// Debug logging for fallback
-	fmt.Printf("[SUB-SESSION FIX] Fallback API call to %s returned err: %v\n", fallbackEndpoint, err)
-	fmt.Printf("[SUB-SESSION FIX] Fallback API response length: %d\n", len(allSubs))
-	if err == nil && len(allSubs) > 0 {
-		fmt.Printf("[SUB-SESSION FIX] Fallback first item: %+v\n", allSubs[0])
-	}
-	
-	if err == nil && len(allSubs) > 0 {
-		fmt.Printf("[SUB-SESSION FIX] Found %d total sub-sessions in system\n", len(allSubs))
-		// Add ones we don't already have
-		for _, sub := range allSubs {
-			// Check if we already have this sub-session
-			alreadyHave := false
-			subID, _ := sub["id"].(string)
-			for _, existing := range allSubSessions {
-				if existingID, _ := existing["id"].(string); existingID == subID {
-					alreadyHave = true
-					break
-				}
-			}
-			if !alreadyHave {
-				sub["_displayType"] = "all"
-				sub["_note"] = fmt.Sprintf("From parent: %v", sub["parentSessionId"])
-				allSubSessions = append(allSubSessions, sub)
-			}
-		}
-	}
-	
-	fmt.Printf("[SUB-SESSION FIX] Total sub-sessions to display: %d\n", len(allSubSessions))
-	
+
+	// Strategy 3: Commented out - we don't want to show ALL sub-sessions
+	// Only show direct children and siblings
+
 	return subSessionsLoadedMsg{
 		subSessions: allSubSessions,
 		currentID:   currentSession.ID,
@@ -269,11 +223,7 @@ func (s *subSessionDialog) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (s *subSessionDialog) switchToSession(sessionID string) tea.Cmd {
-	return func() tea.Msg {
-		// For now, just show a success message
-		// Full implementation requires SDK updates or more complex type handling
-		return toast.NewSuccessToast(fmt.Sprintf("Switched to sub-session: %s", sessionID))
-	}
+	return s.app.SwitchToSession(context.Background(), sessionID)
 }
 func (s *subSessionDialog) Render(background string) string {
 	t := theme.CurrentTheme()
@@ -287,21 +237,25 @@ func (s *subSessionDialog) Render(background string) string {
 		MarginBottom(1)
 
 	breadcrumb := "Session Navigation"
-	if s.currentSession != "" {
-		breadcrumb = fmt.Sprintf("📁 Current Session: %s", s.currentSession)
+	if s.app.Session != nil {
+		if s.app.Session.ParentID != "" {
+			breadcrumb = fmt.Sprintf("📁 Sub-Session: %s", s.app.Session.Title)
+		} else {
+			breadcrumb = fmt.Sprintf("📁 Main Session: %s", s.app.Session.Title)
+		}
 	}
 	content.WriteString(breadcrumbStyle.Render(breadcrumb))
 	content.WriteString("\n")
 
 	if len(s.subSessions) == 0 {
-	emptyStyle := styles.NewStyle().
-	Foreground(t.Secondary()).
-	Align(lipgloss.Center).
-	MarginTop(2)
-	content.WriteString(emptyStyle.Render("No sub-sessions found"))
-	content.WriteString("\n\n")
-	content.WriteString(emptyStyle.Render("💡 Create agents using: 'Create X agents to [task]'"))
-	 content.WriteString("\n")
+		emptyStyle := styles.NewStyle().
+			Foreground(t.Secondary()).
+			Align(lipgloss.Center).
+			MarginTop(2)
+		content.WriteString(emptyStyle.Render("No sub-sessions found"))
+		content.WriteString("\n\n")
+		content.WriteString(emptyStyle.Render("💡 Create agents using: 'Create X agents to [task]'"))
+		content.WriteString("\n")
 		content.WriteString(emptyStyle.Render("Example: Create 3 agents to analyze this code"))
 		content.WriteString("\n\n")
 		hintStyle := styles.NewStyle().
@@ -416,7 +370,6 @@ func (s *subSessionDialog) createSubSessionItem(sub map[string]interface{}, isCh
 
 // NewSubSessionDialog creates a new sub-session navigation dialog
 func NewSubSessionDialog(app *app.App) SubSessionDialog {
-	slog.Debug("[SUB-SESSION FIX] NewSubSessionDialog called")
 	width := min(layout.Current.Container.Width-4, 80)
 	height := min(layout.Current.Container.Height-4, 20)
 
@@ -437,42 +390,52 @@ func NewSubSessionDialog(app *app.App) SubSessionDialog {
 		app:    app,
 	}
 
-	// Load sub-sessions immediately
+	// Load sub-sessions immediately following the sessions dialog pattern
 	ctx := context.Background()
 	currentSession := app.Session
 	if currentSession != nil {
-		slog.Debug("[SUB-SESSION FIX] Loading sub-sessions for", "sessionID", currentSession.ID)
-		
-		// Try to get sub-sessions
+
+		var allSubSessions []map[string]interface{}
+
+		// Strategy 1: Get direct children of current session
 		endpoint := fmt.Sprintf("/session/%s/sub-sessions", currentSession.ID)
 		var directChildren []map[string]interface{}
 		err := app.Client.Get(ctx, endpoint, nil, &directChildren)
-		
-		slog.Debug("[SUB-SESSION FIX] API call result", "endpoint", endpoint, "error", err, "responseLength", len(directChildren))
-		
+
 		if err == nil && len(directChildren) > 0 {
-			// Convert to subSessionItems
-			var items []subSessionItem
-			for _, sub := range directChildren {
-				items = append(items, dialog.createSubSessionItem(sub, false, 0))
+
+			for i := range directChildren {
+				directChildren[i]["_displayType"] = "direct-child"
 			}
-			dialog.list.SetItems(items)
-			dialog.subSessions = directChildren
-		} else {
-			// Try fallback to all sub-sessions
-			fallbackEndpoint := "/sub-sessions"
-			var allSubs []map[string]interface{}
-			err = app.Client.Get(ctx, fallbackEndpoint, nil, &allSubs)
-			slog.Debug("[SUB-SESSION FIX] Fallback API result", "endpoint", fallbackEndpoint, "error", err, "responseLength", len(allSubs))
-			
-			if err == nil && len(allSubs) > 0 {
-				var items []subSessionItem
-				for _, sub := range allSubs {
-					items = append(items, dialog.createSubSessionItem(sub, false, 0))
+			allSubSessions = append(allSubSessions, directChildren...)
+		}
+
+		// Strategy 2: If current session has a parent, get siblings
+		if currentSession.ParentID != "" {
+
+			parentEndpoint := fmt.Sprintf("/session/%s/sub-sessions", currentSession.ParentID)
+			var siblings []map[string]interface{}
+			err = app.Client.Get(ctx, parentEndpoint, nil, &siblings)
+
+			if err == nil && len(siblings) > 0 {
+
+				// Mark siblings and exclude current session
+				for i := range siblings {
+					if siblings[i]["id"] != currentSession.ID {
+						siblings[i]["_displayType"] = "sibling"
+						siblings[i]["_note"] = "Sibling sub-session"
+						allSubSessions = append(allSubSessions, siblings[i])
+					}
 				}
-				dialog.list.SetItems(items)
-				dialog.subSessions = allSubs
 			}
+		}
+
+		// Build tree structure and set items
+		if len(allSubSessions) > 0 {
+			dialog.subSessions = allSubSessions
+			items := dialog.buildTreeStructure(allSubSessions, currentSession.ID)
+			dialog.list.SetItems(items)
+
 		}
 	}
 

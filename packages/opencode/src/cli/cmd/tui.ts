@@ -45,7 +45,8 @@ export const TuiCommand = cmd({
           }
         }
 
-        const goPath = Bun.which("go", { PATH: process.env["PATH"] }) || "/usr/bin/go"
+        const goPath =
+          Bun.which("go", { PATH: process.env["PATH"] }) || "/usr/bin/go"
         let cmd = [goPath, "run", "./main.go"]
         let cwd = Bun.fileURLToPath(
           new URL("../../../../tui/cmd/dgmo", import.meta.url),
@@ -68,11 +69,14 @@ export const TuiCommand = cmd({
         const proc = Bun.spawn({
           cmd: [...cmd, ...process.argv.slice(2)],
           cwd,
-          stdout: "inherit",
-          stderr: "inherit",
+          stdout:
+            process.env["OPENCODE_ENV"] === "production" ? "ignore" : "inherit",
+          stderr:
+            process.env["OPENCODE_ENV"] === "production" ? "ignore" : "inherit",
           stdin: "inherit",
           env: {
             ...process.env,
+            OPENCODE_ENV: process.env["OPENCODE_ENV"] || "production",
             DGMO_SERVER: `http://${server.hostname}:${server.port}`,
             OPENCODE_SERVER: `http://${server.hostname}:${server.port}`, // Backwards compatibility
             DGMO_APP_INFO: JSON.stringify(app),

@@ -1,3 +1,4 @@
+import { Debug } from "../util/debug"
 import { Log } from "../util/log"
 import { Bus } from "../bus"
 import { describeRoute, generateSpecs, openAPISpecs } from "hono-openapi"
@@ -5,7 +6,6 @@ import { Hono } from "hono"
 import { streamSSE } from "hono/streaming"
 import { Session } from "../session"
 import { SubSession } from "../session/sub-session"
-import { Storage } from "../storage/storage"
 import { resolver, validator as zValidator } from "hono-openapi/zod"
 import { z } from "zod"
 import { Message } from "../session/message"
@@ -483,60 +483,11 @@ export namespace Server {
         ),
         async (c) => {
           const parentId = c.req.valid("param").id
-          console.log(
-            "[SERVER DEBUG] Getting sub-sessions for parent:",
-            parentId,
-          )
-          console.log("[SERVER DEBUG] Request URL:", c.req.url)
-          console.log("[SERVER DEBUG] Request method:", c.req.method)
-
-          // SUB-AGENT 2: Enhanced debugging
-          console.log("[SERVER DEBUG] Request headers:", c.req.header())
-          console.log(
-            "[SERVER DEBUG] Current working directory:",
-            process.cwd(),
-          )
-
-          // Get app info to debug path issues
-          const appInfo = App.info()
-          console.log("[SERVER DEBUG] App data path:", appInfo.path.data)
-          console.log("[SERVER DEBUG] App root path:", appInfo.path.root)
-          console.log("[SERVER DEBUG] App cwd path:", appInfo.path.cwd)
 
           try {
             const subSessions = await SubSession.getByParent(parentId)
-            console.log(
-              "[SERVER DEBUG] Found",
-              subSessions.length,
-              "sub-sessions",
-            )
-            console.log(
-              "[SERVER DEBUG] Sub-sessions:",
-              subSessions.map((s) => ({ id: s.id, status: s.status })),
-            )
-
-            // Debug storage paths
-            const indexPath = `session/sub-session-index/${parentId}`
-            console.log("[SERVER DEBUG] Looking for index at key:", indexPath)
-
-            // List all sub-session index files to see what exists
-            console.log("[SERVER DEBUG] Listing all sub-session index files...")
-            try {
-              const files: string[] = []
-              for await (const file of Storage.list(
-                "session/sub-session-index",
-              )) {
-                files.push(file)
-              }
-              console.log("[SERVER DEBUG] Found index files:", files)
-            } catch (e) {
-              console.log("[SERVER DEBUG] Error listing index files:", e)
-            }
-
             return c.json(subSessions)
           } catch (error: any) {
-            console.error("[SERVER DEBUG] Error getting sub-sessions:", error)
-            console.error("[SERVER DEBUG] Error stack:", error?.stack)
             return c.json([])
           }
         },

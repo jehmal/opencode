@@ -1,3 +1,4 @@
+import { Debug } from "./debug"
 import { execSync } from "child_process"
 import path from "path"
 import fs from "fs"
@@ -18,12 +19,12 @@ export namespace ProjectPath {
       }).trim()
       
       if (result && fs.existsSync(result)) {
-        console.log("[PROJECT-PATH] Found git root:", result)
+        Debug.log("[PROJECT-PATH] Found git root:", result)
         return result
       }
     } catch (e) {
       // Not a git repository or git not available
-      console.log("[PROJECT-PATH] Git root not found, falling back to cwd")
+      Debug.log("[PROJECT-PATH] Git root not found, falling back to cwd")
     }
     return null
   }
@@ -40,13 +41,13 @@ export namespace ProjectPath {
     const gitRoot = findGitRoot(process.cwd())
     if (gitRoot) {
       cachedProjectPath = gitRoot
-      console.log("[PROJECT-PATH] Using git root as project path:", gitRoot)
+      Debug.log("[PROJECT-PATH] Using git root as project path:", gitRoot)
       return gitRoot
     }
     
     // Fallback to cwd
     cachedProjectPath = process.cwd()
-    console.log("[PROJECT-PATH] Using cwd as project path:", cachedProjectPath)
+    Debug.log("[PROJECT-PATH] Using cwd as project path:", cachedProjectPath)
     return cachedProjectPath
   }
   

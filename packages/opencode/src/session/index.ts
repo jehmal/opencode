@@ -1,3 +1,4 @@
+import { Debug } from "../util/debug"
 import path from "path"
 import { App } from "../app/app"
 import { Identifier } from "../id/id"
@@ -422,7 +423,7 @@ export namespace Session {
     const sessionInfo = await get(input.sessionID)
     const parentId = sessionInfo.parentID
 
-    console.log("[SESSION] Tool filtering check:", {
+    Debug.log("[SESSION] Tool filtering check:", {
       sessionID: input.sessionID,
       parentID: parentId,
       parentIDType: typeof parentId,
@@ -457,7 +458,7 @@ export namespace Session {
       )
 
       if (!isAllowed) {
-        console.log("[SESSION] Tool filtered out:", toolName)
+        Debug.log("[SESSION] Tool filtered out:", toolName)
         continue // Skip tools that aren't allowed
       }
 
