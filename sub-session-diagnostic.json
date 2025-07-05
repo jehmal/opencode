@@ -1,0 +1,22 @@
+{
+  "timestamp": "2025-07-05T00:00:52.745Z",
+  "appInfo": {
+    "user": "jehma",
+    "hostname": "BigBoi",
+    "time": {},
+    "git": true,
+    "path": {
+      "config": "/home/jehma/.config/opencode",
+      "state": "/home/jehma/.local/state/opencode",
+      "data": "/home/jehma/.local/share/opencode/project/mnt-c-Users-jehma-Desktop-AI-DGMSTT-opencode",
+      "root": "/mnt/c/Users/jehma/Desktop/AI/DGMSTT/opencode",
+      "cwd": "/mnt/c/Users/jehma/Desktop/AI/DGMSTT/opencode"
+    }
+  },
+  "sessionCount": 97,
+  "totalSubSessions": 3,
+  "testResults": {
+    "storagePathExists": true,
+    "sessionPathExists": true
+  }
+}
