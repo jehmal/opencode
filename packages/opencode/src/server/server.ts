@@ -4,6 +4,8 @@ import { describeRoute, generateSpecs, openAPISpecs } from "hono-openapi"
 import { Hono } from "hono"
 import { streamSSE } from "hono/streaming"
 import { Session } from "../session"
+import { SubSession } from "../session/sub-session"
+import { Storage } from "../storage/storage"
 import { resolver, validator as zValidator } from "hono-openapi/zod"
 import { z } from "zod"
 import { Message } from "../session/message"
@@ -456,6 +458,186 @@ export namespace Server {
           const body = c.req.valid("json")
           const msg = await Session.chat({ ...body, sessionID })
           return c.json(msg)
+        },
+      )
+      .get(
+        "/session/:id/sub-sessions",
+        describeRoute({
+          description: "Get all sub-sessions for a parent session",
+          responses: {
+            200: {
+              description: "List of sub-sessions",
+              content: {
+                "application/json": {
+                  schema: resolver(SubSession.Info.array()),
+                },
+              },
+            },
+          },
+        }),
+        zValidator(
+          "param",
+          z.object({
+            id: z.string().openapi({ description: "Parent Session ID" }),
+          }),
+        ),
+        async (c) => {
+          const parentId = c.req.valid("param").id
+          console.log(
+            "[SERVER DEBUG] Getting sub-sessions for parent:",
+            parentId,
+          )
+          console.log("[SERVER DEBUG] Request URL:", c.req.url)
+          console.log("[SERVER DEBUG] Request method:", c.req.method)
+
+          // SUB-AGENT 2: Enhanced debugging
+          console.log("[SERVER DEBUG] Request headers:", c.req.header())
+          console.log(
+            "[SERVER DEBUG] Current working directory:",
+            process.cwd(),
+          )
+
+          // Get app info to debug path issues
+          const appInfo = App.info()
+          console.log("[SERVER DEBUG] App data path:", appInfo.path.data)
+          console.log("[SERVER DEBUG] App root path:", appInfo.path.root)
+          console.log("[SERVER DEBUG] App cwd path:", appInfo.path.cwd)
+
+          try {
+            const subSessions = await SubSession.getByParent(parentId)
+            console.log(
+              "[SERVER DEBUG] Found",
+              subSessions.length,
+              "sub-sessions",
+            )
+            console.log(
+              "[SERVER DEBUG] Sub-sessions:",
+              subSessions.map((s) => ({ id: s.id, status: s.status })),
+            )
+
+            // Debug storage paths
+            const indexPath = `session/sub-session-index/${parentId}`
+            console.log("[SERVER DEBUG] Looking for index at key:", indexPath)
+
+            // List all sub-session index files to see what exists
+            console.log("[SERVER DEBUG] Listing all sub-session index files...")
+            try {
+              const files: string[] = []
+              for await (const file of Storage.list(
+                "session/sub-session-index",
+              )) {
+                files.push(file)
+              }
+              console.log("[SERVER DEBUG] Found index files:", files)
+            } catch (e) {
+              console.log("[SERVER DEBUG] Error listing index files:", e)
+            }
+
+            return c.json(subSessions)
+          } catch (error: any) {
+            console.error("[SERVER DEBUG] Error getting sub-sessions:", error)
+            console.error("[SERVER DEBUG] Error stack:", error?.stack)
+            return c.json([])
+          }
+        },
+      )
+      .get(
+        "/sub-sessions",
+        describeRoute({
+          description: "List all sub-sessions across all parent sessions",
+          responses: {
+            200: {
+              description: "List of all sub-sessions",
+              content: {
+                "application/json": {
+                  schema: resolver(SubSession.Info.array()),
+                },
+              },
+            },
+          },
+        }),
+        async (c) => {
+          const subSessions = await SubSession.list()
+          return c.json(subSessions)
+        },
+      )
+      .get(
+        "/sub-sessions/search",
+        describeRoute({
+          description: "Search sub-sessions by query",
+          responses: {
+            200: {
+              description: "Search results",
+              content: {
+                "application/json": {
+                  schema: resolver(SubSession.Info.array()),
+                },
+              },
+            },
+          },
+        }),
+        zValidator(
+          "query",
+          z.object({
+            q: z.string().openapi({ description: "Search query" }),
+          }),
+        ),
+        async (c) => {
+          const query = c.req.valid("query").q
+          const results = await SubSession.search(query)
+          return c.json(results)
+        },
+      )
+      .get(
+        "/sub-session/:id",
+        describeRoute({
+          description: "Get a specific sub-session",
+          responses: {
+            200: {
+              description: "Sub-session details",
+              content: {
+                "application/json": {
+                  schema: resolver(SubSession.Info),
+                },
+              },
+            },
+          },
+        }),
+        zValidator(
+          "param",
+          z.object({
+            id: z.string().openapi({ description: "Sub-session ID" }),
+          }),
+        ),
+        async (c) => {
+          const subSession = await SubSession.get(c.req.valid("param").id)
+          return c.json(subSession)
+        },
+      )
+      .delete(
+        "/sub-session/:id",
+        describeRoute({
+          description: "Delete a sub-session",
+          responses: {
+            200: {
+              description: "Successfully deleted sub-session",
+              content: {
+                "application/json": {
+                  schema: resolver(z.boolean()),
+                },
+              },
+            },
+          },
+        }),
+        zValidator(
+          "param",
+          z.object({
+            id: z.string().openapi({ description: "Sub-session ID" }),
+          }),
+        ),
+        async (c) => {
+          await SubSession.remove(c.req.valid("param").id)
+          return c.json(true)
         },
       )
       .get(

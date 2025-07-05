@@ -1,0 +1,8 @@
+theme = "dgmo"
+provider = "anthropic"
+model = "claude-sonnet-4-20250514"
+
+[[recently_used_models]]
+  provider_id = "anthropic"
+  model_id = "claude-sonnet-4-20250514"
+  last_used = 2025-07-05T17:35:34.231976726+08:00

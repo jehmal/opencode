@@ -5,8 +5,8 @@ export namespace AgentConfig {
   export const AgentMode = z.enum(["read-only", "all-tools"])
   export type AgentMode = z.infer<typeof AgentMode>
 
-  // Default mode is read-only for safety
-  const DEFAULT_MODE: AgentMode = "read-only"
+  // Default mode is all-tools to enable full functionality including sub-sessions
+  const DEFAULT_MODE: AgentMode = "all-tools"
 
   // Session-specific modes storage - using session ID as key
   const sessionModes = new Map<string, AgentMode>()
@@ -35,6 +35,7 @@ export namespace AgentConfig {
     "task",
     "todowrite",
     "todoread",
+    "diagnose_subsessions",
     // All other tools
   ]
 
@@ -63,7 +64,14 @@ export namespace AgentConfig {
     parentId?: string,
   ): boolean {
     // Sub-agent sessions have a parent session ID
-    return parentId !== undefined
+    // Check for actual value, not just undefined
+    // Also check for string "undefined" which might come from serialization
+    return (
+      parentId !== undefined &&
+      parentId !== null &&
+      parentId !== "" &&
+      parentId !== "undefined"
+    )
   }
 
   // Check if main DGMO session (not a sub-agent)
@@ -77,14 +85,36 @@ export namespace AgentConfig {
     parentId?: string,
   ): Promise<string[]> {
     // Main DGMO always has all tools
-    if (isMainSession(sessionId, parentId)) {
+    const isMain = isMainSession(sessionId, parentId)
+    console.log("[AGENT-CONFIG] getAllowedTools:", {
+      sessionId,
+      parentId,
+      parentIdType: typeof parentId,
+      parentIdTruthy: !!parentId,
+      parentIdLength: typeof parentId === "string" ? parentId.length : "N/A",
+      isMainSession: isMain,
+      willGetAllTools: isMain,
+    })
+
+    if (isMain) {
+      console.log(
+        "[AGENT-CONFIG] Main session detected, returning ALL_TOOLS including task",
+      )
       return ALL_TOOLS
     }
 
     // Get session-specific mode or fall back to global
     const mode = getSessionAgentMode(sessionId) || (await getAgentMode())
+    console.log("[AGENT-CONFIG] Session mode:", mode)
 
-    return mode === "all-tools" ? ALL_TOOLS : READ_ONLY_TOOLS
+    const tools = mode === "all-tools" ? ALL_TOOLS : READ_ONLY_TOOLS
+    console.log(
+      "[AGENT-CONFIG] Returning tools:",
+      tools.length,
+      "tools, includes task:",
+      tools.includes("task"),
+    )
+    return tools
   }
 
   // Check if a tool is allowed for a session
@@ -99,6 +129,16 @@ export namespace AgentConfig {
     }
 
     const allowedTools = await getAllowedTools(sessionId, parentId)
-    return allowedTools.includes(toolName)
+    const isAllowed = allowedTools.includes(toolName)
+    if (toolName === "task") {
+      console.log("[AGENT-CONFIG] isToolAllowed for task:", {
+        sessionId,
+        parentId,
+        allowedToolsCount: allowedTools.length,
+        isAllowed,
+        allowedTools: allowedTools.slice(0, 5) + "...",
+      })
+    }
+    return isAllowed
   }
 }

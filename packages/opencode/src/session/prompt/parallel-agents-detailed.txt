@@ -7,10 +7,14 @@ When users request parallel agents, you MUST use the task tool to create REAL su
 Recognize these patterns as requests for parallel agents:
 - "use your sub agents to..."
 - "create [number] agents to..."
+- "create agents to..."
+- "Create [number] agents to..."
+- "make [number] agents..."
 - "in parallel..."
 - "multiple agents..."
 - "simultaneously..."
 - "concurrently..."
+- Any request to create agents for tasks
 
 ## CORRECT Implementation
 

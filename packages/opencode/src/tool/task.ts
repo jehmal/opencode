@@ -13,6 +13,8 @@ import {
   emitTaskFailed,
 } from "../events/task-events"
 
+console.log("[TASK-TOOL] TaskTool module loaded at", new Date().toISOString())
+
 export const TaskTool = Tool.define({
   id: "task",
   description: DESCRIPTION,
@@ -37,6 +39,26 @@ export const TaskTool = Tool.define({
       .describe("Maximum number of automatic retry attempts"),
   }),
   async execute(params, ctx) {
+    console.log("\n=== TASK TOOL EXECUTION STARTED ===")
+    console.log("[TASK] Timestamp:", new Date().toISOString())
+    console.log("[TASK] Task tool executed with params:", params)
+    console.log("[TASK] Context sessionID:", ctx.sessionID)
+    console.log("[TASK] Creating sub-session with parent:", ctx.sessionID)
+    console.log("[TASK] Current working directory:", process.cwd())
+    
+    // Simple debug log to file
+    try {
+      const { logTaskExecution } = await import("./task-debug")
+      logTaskExecution(ctx.sessionID, params.description)
+    } catch (e) {
+      console.error("[TASK] Debug log failed:", e)
+    }
+    
+    // Import App to get paths
+    const { App } = await import("../app/app")
+    const appInfo = App.info()
+    console.log("[TASK] App info paths:", appInfo.path)
+
     // Create a sub-session with the current session as parent
     const subSession = await Session.create(ctx.sessionID)
     const msg = await Session.getMessage(ctx.sessionID, ctx.messageID)
@@ -47,12 +69,45 @@ export const TaskTool = Tool.define({
     AgentConfig.setSessionAgentMode(subSession.id, mode)
 
     // Store sub-session info for navigation
-    await SubSession.create(
-      ctx.sessionID,
-      subSession.id,
-      `Agent ${params.description}`,
-      params.prompt,
-    )
+    try {
+      await SubSession.create(
+        ctx.sessionID,
+        subSession.id,
+        `Agent ${params.description}`,
+        params.prompt,
+      )
+      console.log("[TASK] SubSession.create completed successfully")
+      
+      // Verification Agent - verify sub-session creation in real-time
+      const verificationAgent = async () => {
+        await new Promise(resolve => setTimeout(resolve, 100)) // Brief delay for storage
+        const { SessionDiagnostics } = await import("../session/diagnostics")
+        const verification = await SessionDiagnostics.verifySubSessions(ctx.sessionID)
+        console.log("[VERIFICATION] Sub-session creation result:", {
+          parentId: ctx.sessionID,
+          subSessionId: subSession.id,
+          verified: verification.subSessionCount > 0,
+          totalInStorage: verification.totalInStorage
+        })
+        
+        // Emit custom event for debugging
+        Bus.publish(Bus.event("subsession.created", z.object({
+          parentId: z.string(),
+          subSessionId: z.string(),
+          verified: z.boolean(),
+          count: z.number()
+        })), {
+          parentId: ctx.sessionID,
+          subSessionId: subSession.id,
+          verified: verification.subSessionCount > 0,
+          count: verification.subSessionCount
+        })
+      }
+      verificationAgent().catch(e => console.error("[VERIFICATION] Error:", e)) // Fire and forget
+    } catch (error) {
+      console.error("[TASK] SubSession.create failed:", error)
+      throw error
+    }
 
     // Mark sub-session as running
     await SubSession.update(subSession.id, { status: "running" })

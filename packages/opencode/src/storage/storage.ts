@@ -7,6 +7,26 @@ import fs from "fs/promises"
 
 export namespace Storage {
   const log = Log.create({ service: "storage" })
+  
+  // Normalize storage keys to ensure consistency
+  export function normalizeStorageKey(key: string): string {
+    // Remove any duplicate slashes
+    key = key.replace(/\/+/g, '/')
+    
+    // Ensure no leading slash
+    if (key.startsWith('/')) {
+      key = key.substring(1)
+    }
+    
+    // Ensure no trailing slash for files
+    if (key.endsWith('/') && !key.includes('.json')) {
+      key = key.slice(0, -1)
+    }
+    
+    // Log normalization for debugging if needed
+    // log.info("[STORAGE] Normalized key:", { original: arguments[0], normalized: key })
+    return key
+  }
 
   export const Event = {
     Write: Bus.event(
@@ -25,20 +45,24 @@ export namespace Storage {
   })
 
   export async function remove(key: string) {
+    key = normalizeStorageKey(key)
     const target = path.join(state().dir, key + ".json")
     await fs.unlink(target).catch(() => {})
   }
 
   export async function removeDir(key: string) {
+    key = normalizeStorageKey(key)
     const target = path.join(state().dir, key)
     await fs.rm(target, { recursive: true, force: true }).catch(() => {})
   }
 
   export async function readJSON<T>(key: string) {
+    key = normalizeStorageKey(key)
     return Bun.file(path.join(state().dir, key + ".json")).json() as Promise<T>
   }
 
   export async function writeJSON<T>(key: string, content: T) {
+    key = normalizeStorageKey(key)
     const target = path.join(state().dir, key + ".json")
     const tmp = target + Date.now() + ".tmp"
     await Bun.write(tmp, JSON.stringify(content))
@@ -49,6 +73,7 @@ export namespace Storage {
 
   const glob = new Bun.Glob("**/*")
   export async function* list(prefix: string) {
+    prefix = normalizeStorageKey(prefix)
     try {
       for await (const item of glob.scan({
         cwd: path.join(state().dir, prefix),

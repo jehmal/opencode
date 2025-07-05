@@ -422,6 +422,21 @@ export namespace Session {
     const sessionInfo = await get(input.sessionID)
     const parentId = sessionInfo.parentID
 
+    console.log("[SESSION] Tool filtering check:", {
+      sessionID: input.sessionID,
+      parentID: parentId,
+      parentIDType: typeof parentId,
+      parentIDValue:
+        parentId === undefined
+          ? "undefined"
+          : parentId === null
+            ? "null"
+            : parentId === ""
+              ? "empty string"
+              : parentId,
+      isMainSession: !parentId,
+    })
+
     // Get performance tracker for this session
     const performanceTracker = SessionPerformance.getTracker(input.sessionID)
 
@@ -442,6 +457,7 @@ export namespace Session {
       )
 
       if (!isAllowed) {
+        console.log("[SESSION] Tool filtered out:", toolName)
         continue // Skip tools that aren't allowed
       }
 

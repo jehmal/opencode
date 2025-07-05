@@ -1,0 +1,125 @@
+      .get(
+        "/session/:id/sub-sessions",
+        describeRoute({
+          description: "Get all sub-sessions for a parent session",
+          responses: {
+            200: {
+              description: "List of sub-sessions",
+              content: {
+                "application/json": {
+                  schema: resolver(SubSession.Info.array()),
+                },
+              },
+            },
+          },
+        }),
+        zValidator(
+          "param",
+          z.object({
+            id: z.string().openapi({ description: "Parent Session ID" }),
+          }),
+        ),
+        async (c) => {
+          const subSessions = await SubSession.getByParent(c.req.valid("param").id)
+          return c.json(subSessions)
+        },
+      )
+      .get(
+        "/sub-sessions",
+        describeRoute({
+          description: "List all sub-sessions across all parent sessions",
+          responses: {
+            200: {
+              description: "List of all sub-sessions",
+              content: {
+                "application/json": {
+                  schema: resolver(SubSession.Info.array()),
+                },
+              },
+            },
+          },
+        }),
+        async (c) => {
+          const subSessions = await SubSession.list()
+          return c.json(subSessions)
+        },
+      )
+      .get(
+        "/sub-sessions/search",
+        describeRoute({
+          description: "Search sub-sessions by query",
+          responses: {
+            200: {
+              description: "Search results",
+              content: {
+                "application/json": {
+                  schema: resolver(SubSession.Info.array()),
+                },
+              },
+            },
+          },
+        }),
+        zValidator(
+          "query",
+          z.object({
+            q: z.string().openapi({ description: "Search query" }),
+          }),
+        ),
+        async (c) => {
+          const query = c.req.valid("query").q
+          const results = await SubSession.search(query)
+          return c.json(results)
+        },
+      )
+      .get(
+        "/sub-session/:id",
+        describeRoute({
+          description: "Get a specific sub-session",
+          responses: {
+            200: {
+              description: "Sub-session details",
+              content: {
+                "application/json": {
+                  schema: resolver(SubSession.Info),
+                },
+              },
+            },
+          },
+        }),
+        zValidator(
+          "param",
+          z.object({
+            id: z.string().openapi({ description: "Sub-session ID" }),
+          }),
+        ),
+        async (c) => {
+          const subSession = await SubSession.get(c.req.valid("param").id)
+          return c.json(subSession)
+        },
+      )
+      .delete(
+        "/sub-session/:id",
+        describeRoute({
+          description: "Delete a sub-session",
+          responses: {
+            200: {
+              description: "Successfully deleted sub-session",
+              content: {
+                "application/json": {
+                  schema: resolver(z.boolean()),
+                },
+              },
+            },
+          },
+        }),
+        zValidator(
+          "param",
+          z.object({
+            id: z.string().openapi({ description: "Sub-session ID" }),
+          }),
+        ),
+        async (c) => {
+          await SubSession.remove(c.req.valid("param").id)
+          return c.json(true)
+        },
+      )

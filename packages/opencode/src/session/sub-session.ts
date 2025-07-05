@@ -28,6 +28,19 @@ export namespace SubSession {
     agentName: string,
     taskDescription: string,
   ): Promise<Info> {
+    console.log("[SUB-SESSION DEBUG] Creating sub-session:", {
+      parentSessionId,
+      sessionId,
+      agentName,
+      taskDescription,
+    })
+    
+    // Get storage base path for debugging
+    const { Storage } = await import("../storage/storage")
+    console.log("[SUB-SESSION] Storage operations for sub-session creation:")
+    console.log("[SUB-SESSION] Will write sub-session to:", SUB_SESSION_PATH + sessionId)
+    console.log("[SUB-SESSION] Will update index at:", SUB_SESSION_INDEX_PATH + parentSessionId)
+
     const info: Info = {
       id: sessionId,
       parentSessionId,
@@ -38,14 +51,18 @@ export namespace SubSession {
     }
 
     // Store sub-session info
+    const subSessionPath = SUB_SESSION_PATH + sessionId
+    console.log("[SUB-SESSION DEBUG] Writing to:", subSessionPath)
     await Storage.writeJSON(SUB_SESSION_PATH + sessionId, info)
 
     // Add to parent's sub-session index
     const indexPath = SUB_SESSION_INDEX_PATH + parentSessionId
+    console.log("[SUB-SESSION DEBUG] Updating index at:", indexPath)
     const index = await getParentIndex(parentSessionId)
     index.push(sessionId)
     await Storage.writeJSON(indexPath, index)
 
+    console.log("[SUB-SESSION DEBUG] Sub-session created successfully")
     return info
   }
 
@@ -66,7 +83,16 @@ export namespace SubSession {
 
   // Get all sub-sessions for a parent session
   export async function getByParent(parentSessionId: string): Promise<Info[]> {
+    console.log(
+      "[SUB-SESSION DEBUG] Getting sub-sessions for parent:",
+      parentSessionId,
+    )
     const index = await getParentIndex(parentSessionId)
+    console.log(
+      "[SUB-SESSION DEBUG] Found index with",
+      index.length,
+      "sub-sessions",
+    )
     const subSessions: Info[] = []
 
     for (const id of index) {
@@ -75,10 +101,16 @@ export namespace SubSession {
         subSessions.push(info)
       } catch (e) {
         // Sub-session might have been deleted
+        console.log("[SUB-SESSION DEBUG] Failed to get sub-session:", id, e)
         continue
       }
     }
 
+    console.log(
+      "[SUB-SESSION DEBUG] Returning",
+      subSessions.length,
+      "sub-sessions",
+    )
     // Sort by creation date
     return subSessions.sort((a, b) => b.createdAt - a.createdAt)
   }
@@ -128,11 +160,17 @@ export namespace SubSession {
 
   // Get parent session's sub-session index
   async function getParentIndex(parentSessionId: string): Promise<string[]> {
+    const indexPath = SUB_SESSION_INDEX_PATH + parentSessionId
+    console.log("[SUB-SESSION DEBUG] Reading index from:", indexPath)
     try {
-      return await Storage.readJSON<string[]>(
-        SUB_SESSION_INDEX_PATH + parentSessionId,
-      )
+      const index = await Storage.readJSON<string[]>(indexPath)
+      console.log("[SUB-SESSION DEBUG] Index found with entries:", index)
+      return index
     } catch (e) {
+      console.log(
+        "[SUB-SESSION DEBUG] No index found for parent:",
+        parentSessionId,
+      )
       return []
     }
   }

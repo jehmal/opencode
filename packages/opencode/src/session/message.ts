@@ -1,6 +1,5 @@
 import z from "zod"
 import { Bus } from "../bus"
-import { Provider } from "../provider/provider"
 import { NamedError } from "../util/error"
 
 export namespace Message {
@@ -148,7 +147,13 @@ export namespace Message {
           }),
           error: z
             .discriminatedUnion("name", [
-              Provider.AuthError.Schema,
+              z.object({
+                name: z.literal("ProviderAuthError"),
+                data: z.object({
+                  providerID: z.string(),
+                  message: z.string(),
+                }),
+              }),
               NamedError.Unknown.Schema,
               OutputLengthError.Schema,
             ])
