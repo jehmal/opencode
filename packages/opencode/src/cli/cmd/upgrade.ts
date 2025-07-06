@@ -5,7 +5,7 @@ import { Installation } from "../../installation"
 
 export const UpgradeCommand = {
   command: "upgrade [target]",
-  describe: "upgrade opencode to the latest or a specific version",
+  describe: "upgrade dgmo to the latest or a specific version",
   builder: (yargs: Argv) => {
     return yargs
       .positional("target", {
@@ -28,7 +28,7 @@ export const UpgradeCommand = {
     const method = (args.method as Installation.Method) ?? detectedMethod
     if (method === "unknown") {
       prompts.log.error(
-        `opencode is installed to ${process.execPath} and seems to be managed by a package manager`,
+        `dgmo is installed to ${process.execPath} and seems to be managed by a package manager`,
       )
       prompts.outro("Done")
       return

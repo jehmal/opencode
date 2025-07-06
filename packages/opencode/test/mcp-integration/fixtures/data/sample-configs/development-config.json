@@ -1,0 +1,86 @@
+{
+  // Development environment configuration
+  "mcpServers": {
+    "dev-filesystem": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-filesystem",
+        "./dev-workspace"
+      ],
+      "env": {
+        "NODE_ENV": "development",
+        "DEBUG": "mcp:*",
+        "LOG_LEVEL": "debug",
+        "ENABLE_HOT_RELOAD": "true"
+      },
+      "development": {
+        "autoRestart": true,
+        "watchFiles": true,
+        "enableDebugMode": true,
+        "verboseLogging": true
+      }
+    },
+    "dev-memory": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-memory"],
+      "env": {
+        "NODE_ENV": "development",
+        "MEMORY_SIZE": "100",
+        "ENABLE_PERSISTENCE": "false",
+        "DEBUG_MEMORY_USAGE": "true"
+      },
+      "development": {
+        "enableDebugEndpoints": true,
+        "exposeInternalState": true,
+        "allowUnsafeOperations": true
+      }
+    },
+    "local-test-server": {
+      "command": "node",
+      "args": ["--inspect=9229", "./test-servers/mock-server.js"],
+      "env": {
+        "NODE_ENV": "development",
+        "MOCK_RESPONSES": "true",
+        "SIMULATE_LATENCY": "100",
+        "ENABLE_CORS": "true"
+      },
+      "development": {
+        "enableMocking": true,
+        "mockResponseDelay": 100,
+        "enableCors": true,
+        "allowOrigins": ["http://localhost:3000", "http://127.0.0.1:3000"]
+      }
+    },
+    "dev-websocket": {
+      "url": "ws://localhost:8765/mcp/dev",
+      "transport": "websocket",
+      "protocols": ["mcp-v1"],
+      "development": {
+        "enableReconnectOnCodeChange": true,
+        "logAllMessages": true,
+        "enableMessageInspection": true,
+        "bypassAuthentication": true
+      }
+    }
+  },
+  "development": {
+    "globalSettings": {
+      "enableHotReload": true,
+      "watchConfigFile": true,
+      "enableDebugMode": true,
+      "logLevel": "debug",
+      "enableCors": true,
+      "allowedOrigins": ["*"],
+      "enableDevTools": true,
+      "exposeMetrics": true,
+      "metricsPort": 9090
+    },
+    "testing": {
+      "enableTestMode": true,
+      "mockExternalServices": true,
+      "enableFixtures": true,
+      "fixturesPath": "./test/fixtures"
+    }
+  }
+}

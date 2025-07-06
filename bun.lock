@@ -36,7 +36,7 @@
       "name": "opencode",
       "version": "0.0.5",
       "bin": {
-        "opencode": "./bin/opencode",
+        "dgmo": "./bin/dgmo",
       },
       "dependencies": {
         "@clack/prompts": "0.11.0",

@@ -1,0 +1,130 @@
+{
+  // Production environment configuration
+  "mcpServers": {
+    "prod-filesystem": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-filesystem", "/app/data"],
+      "env": {
+        "NODE_ENV": "production",
+        "LOG_LEVEL": "info",
+        "ENABLE_METRICS": "true",
+        "MAX_FILE_SIZE": "52428800",
+        "RATE_LIMIT_REQUESTS": "1000",
+        "RATE_LIMIT_WINDOW": "3600"
+      },
+      "production": {
+        "enableHealthChecks": true,
+        "healthCheckInterval": 30000,
+        "enableGracefulShutdown": true,
+        "shutdownTimeout": 10000,
+        "enableCircuitBreaker": true,
+        "circuitBreakerThreshold": 5
+      }
+    },
+    "prod-database": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-postgres"],
+      "env": {
+        "NODE_ENV": "production",
+        "POSTGRES_CONNECTION_STRING": "${DATABASE_URL}",
+        "CONNECTION_POOL_SIZE": "20",
+        "CONNECTION_TIMEOUT": "30000",
+        "QUERY_TIMEOUT": "60000",
+        "ENABLE_SSL": "true"
+      },
+      "production": {
+        "enableConnectionPooling": true,
+        "maxConnections": 20,
+        "connectionTimeout": 30000,
+        "enableQueryLogging": false,
+        "enableSlowQueryLogging": true,
+        "slowQueryThreshold": 5000
+      }
+    },
+    "prod-api-gateway": {
+      "url": "wss://api.production.example.com/mcp",
+      "transport": "websocket",
+      "protocols": ["mcp-v1"],
+      "headers": {
+        "Authorization": "Bearer ${PROD_API_TOKEN}",
+        "X-Service-Version": "${SERVICE_VERSION}",
+        "X-Environment": "production"
+      },
+      "production": {
+        "enableLoadBalancing": true,
+        "loadBalancerEndpoints": [
+          "wss://api1.production.example.com/mcp",
+          "wss://api2.production.example.com/mcp",
+          "wss://api3.production.example.com/mcp"
+        ],
+        "healthCheckPath": "/health",
+        "enableFailover": true,
+        "failoverTimeout": 5000
+      }
+    },
+    "prod-cache": {
+      "command": "node",
+      "args": ["./servers/redis-cache-server.js"],
+      "env": {
+        "NODE_ENV": "production",
+        "REDIS_URL": "${REDIS_URL}",
+        "CACHE_TTL": "3600",
+        "MAX_MEMORY_USAGE": "1GB",
+        "ENABLE_CLUSTERING": "true"
+      },
+      "production": {
+        "enableClustering": true,
+        "clusterNodes": ["redis1:6379", "redis2:6379", "redis3:6379"],
+        "enablePersistence": true,
+        "backupInterval": 3600000,
+        "enableCompression": true
+      }
+    }
+  },
+  "production": {
+    "globalSettings": {
+      "enableHttps": true,
+      "enforceSecureConnections": true,
+      "maxConcurrentConnections": 1000,
+      "connectionTimeout": 30000,
+      "enableRateLimiting": true,
+      "rateLimitWindow": 3600000,
+      "rateLimitMax": 10000,
+      "enableLogging": true,
+      "logLevel": "info",
+      "logFormat": "json",
+      "enableMetrics": true,
+      "metricsEndpoint": "/metrics",
+      "enableHealthChecks": true,
+      "healthCheckEndpoint": "/health"
+    },
+    "monitoring": {
+      "enableAPM": true,
+      "apmServiceName": "mcp-servers",
+      "enableTracing": true,
+      "tracingSampleRate": 0.1,
+      "enableErrorTracking": true,
+      "errorTrackingDsn": "${ERROR_TRACKING_DSN}",
+      "enableAlerts": true,
+      "alertWebhookUrl": "${ALERT_WEBHOOK_URL}"
+    },
+    "security": {
+      "enableSecurityHeaders": true,
+      "enableCsrfProtection": true,
+      "enableRateLimiting": true,
+      "enableIpWhitelisting": false,
+      "allowedIps": [],
+      "enableRequestValidation": true,
+      "maxRequestSize": "10485760"
+    },
+    "scaling": {
+      "enableAutoScaling": true,
+      "minInstances": 2,
+      "maxInstances": 10,
+      "targetCpuUtilization": 70,
+      "targetMemoryUtilization": 80,
+      "scaleUpCooldown": 300000,
+      "scaleDownCooldown": 600000
+    }
+  }
+}

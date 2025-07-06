@@ -49,7 +49,7 @@ export namespace Installation {
   }
 
   export async function method() {
-    if (process.execPath.includes(path.join(".opencode", "bin"))) return "curl"
+    if (process.execPath.includes(path.join(".dgmo", "bin"))) return "curl"
     const exec = process.execPath.toLowerCase()
 
     const checks = [
@@ -71,7 +71,7 @@ export namespace Installation {
       },
       {
         name: "brew" as const,
-        command: () => $`brew list --formula opencode-ai`.throws(false).text(),
+        command: () => $`brew list --formula dgmo`.throws(false).text(),
       },
     ]
 
@@ -85,7 +85,7 @@ export namespace Installation {
 
     for (const check of checks) {
       const output = await check.command()
-      if (output.includes("opencode-ai")) {
+      if (output.includes("dgmo")) {
         return check.name
       }
     }
@@ -104,18 +104,18 @@ export namespace Installation {
     const cmd = (() => {
       switch (method) {
         case "curl":
-          return $`curl -fsSL https://opencode.ai/install | bash`.env({
+          return $`curl -fsSL https://dgmo.ai/install | bash`.env({
             ...process.env,
             VERSION: target,
           })
         case "npm":
-          return $`npm install -g opencode-ai@${target}`
+          return $`npm install -g dgmo@${target}`
         case "pnpm":
-          return $`pnpm install -g opencode-ai@${target}`
+          return $`pnpm install -g dgmo@${target}`
         case "bun":
-          return $`bun install -g opencode-ai@${target}`
+          return $`bun install -g dgmo@${target}`
         case "brew":
-          return $`brew install sst/tap/opencode`.env({
+          return $`brew install sst/tap/dgmo`.env({
             HOMEBREW_NO_AUTO_UPDATE: "1",
           })
         default:
@@ -139,7 +139,7 @@ export namespace Installation {
     typeof OPENCODE_VERSION === "string" ? OPENCODE_VERSION : "dev"
 
   export async function latest() {
-    return fetch("https://api.github.com/repos/sst/opencode/releases/latest")
+    return fetch("https://api.github.com/repos/sst/dgmo/releases/latest")
       .then((res) => res.json())
       .then((data) => data.tag_name.slice(1) as string)
   }

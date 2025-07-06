@@ -1,0 +1,28 @@
+{
+  "jsonrpc": "2.0",
+  "id": "init-1",
+  "result": {
+    "protocolVersion": "2024-11-05",
+    "capabilities": {
+      "logging": {},
+      "prompts": {
+        "listChanged": true
+      },
+      "resources": {
+        "subscribe": true,
+        "listChanged": true
+      },
+      "tools": {
+        "listChanged": true
+      }
+    },
+    "serverInfo": {
+      "name": "test-mcp-server",
+      "version": "1.0.0",
+      "description": "Test MCP server for integration testing",
+      "author": "OpenCode Test Suite",
+      "license": "MIT"
+    },
+    "instructions": "This is a test MCP server that provides mock responses for integration testing. Use the available tools and resources to test MCP protocol functionality."
+  }
+}

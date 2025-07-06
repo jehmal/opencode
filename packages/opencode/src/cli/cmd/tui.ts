@@ -120,7 +120,7 @@ export const TuiCommand = cmd({
         UI.empty()
         UI.println(UI.logo("   "))
         const result = await Bun.spawn({
-          cmd: [process.execPath, "auth", "login"],
+          cmd: [process.execPath, process.argv[1], "auth", "login"],
           cwd: process.cwd(),
           stdout: "inherit",
           stderr: "inherit",

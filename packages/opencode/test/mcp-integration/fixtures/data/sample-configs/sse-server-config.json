@@ -1,0 +1,35 @@
+{
+  // Configuration for Server-Sent Events (SSE) based MCP servers
+  "mcpServers": {
+    "sse-weather": {
+      "url": "http://localhost:3001/sse/weather",
+      "transport": "sse",
+      "headers": {
+        "Authorization": "Bearer weather-api-token",
+        "X-API-Version": "v1"
+      },
+      "timeout": 30000,
+      "retryInterval": 5000
+    },
+    "sse-notifications": {
+      "url": "https://api.example.com/mcp/notifications",
+      "transport": "sse",
+      "headers": {
+        "Authorization": "Bearer notification-token",
+        "Accept": "text/event-stream"
+      },
+      "timeout": 60000,
+      "retryInterval": 10000,
+      "maxRetries": 3
+    },
+    "sse-realtime-data": {
+      "url": "http://localhost:8080/events/data-stream",
+      "transport": "sse",
+      "headers": {
+        "X-Client-ID": "mcp-client-001"
+      },
+      "timeout": 120000,
+      "retryInterval": 2000
+    }
+  }
+}

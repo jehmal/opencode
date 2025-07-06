@@ -1,0 +1,32 @@
+{
+  // Configuration for stdio-based MCP servers
+  "mcpServers": {
+    "stdio-filesystem": {
+      "command": "node",
+      "args": ["./servers/filesystem-server.js"],
+      "transport": "stdio",
+      "env": {
+        "ROOT_PATH": "/home/user/documents",
+        "ALLOWED_EXTENSIONS": ".txt,.md,.json,.js,.ts"
+      }
+    },
+    "stdio-calculator": {
+      "command": "python3",
+      "args": ["-m", "mcp_calculator"],
+      "transport": "stdio",
+      "env": {
+        "PRECISION": "10",
+        "MAX_OPERATIONS": "1000"
+      }
+    },
+    "stdio-git": {
+      "command": "./bin/git-mcp-server",
+      "args": ["--repo-path", "/path/to/repo"],
+      "transport": "stdio",
+      "env": {
+        "GIT_AUTHOR_NAME": "MCP Server",
+        "GIT_AUTHOR_EMAIL": "mcp@example.com"
+      }
+    }
+  }
+}

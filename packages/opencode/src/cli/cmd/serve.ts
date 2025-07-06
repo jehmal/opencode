@@ -20,7 +20,7 @@ export const ServeCommand = cmd({
         describe: "hostname to listen on",
         default: "127.0.0.1",
       }),
-  describe: "starts a headless opencode server",
+  describe: "starts a headless dgmo server",
   handler: async (args) => {
     const cwd = process.cwd()
     await App.provide({ cwd }, async () => {
@@ -42,7 +42,7 @@ export const ServeCommand = cmd({
       taskEventServer.start()
 
       console.log(
-        `opencode server listening on http://${server.hostname}:${server.port}`,
+        `dgmo server listening on http://${server.hostname}:${server.port}`,
       )
       console.log(
         `Task event WebSocket server listening on ws://localhost:5747`,

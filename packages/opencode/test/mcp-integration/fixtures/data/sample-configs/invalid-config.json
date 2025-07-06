@@ -1,0 +1,27 @@
+{
+  // Malformed configuration for error testing
+  "mcpServers": {
+    "broken-server": {
+      "command": "invalid-command-that-does-not-exist",
+      "args": ["--invalid", "flag"],
+      // Missing required fields intentionally
+    },
+    "malformed-transport": {
+      "url": "not-a-valid-url",
+      "transport": "invalid-transport-type",
+      "timeout": "not-a-number"
+    },
+    "circular-reference": {
+      "command": "echo",
+      "args": ["test"],
+      "env": {
+        "SELF_REF": "${SELF_REF}"
+      }
+    }
+    // Missing comma intentionally to break JSON parsing
+    "syntax-error": {
+      "command": "test"
+      "args": []  // Missing comma
+    }
+  }
+}

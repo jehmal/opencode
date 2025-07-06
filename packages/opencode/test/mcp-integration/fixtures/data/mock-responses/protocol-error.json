@@ -1,0 +1,30 @@
+{
+  "jsonrpc": "2.0",
+  "id": "protocol-1",
+  "error": {
+    "code": -32600,
+    "message": "Invalid Request",
+    "data": {
+      "type": "PROTOCOL_ERROR",
+      "message": "Invalid JSON-RPC request format",
+      "details": {
+        "reason": "Missing required field 'method'",
+        "received": {
+          "jsonrpc": "2.0",
+          "id": "invalid-1",
+          "params": {
+            "name": "test_tool"
+          }
+        },
+        "expected": {
+          "jsonrpc": "2.0",
+          "id": "string|number",
+          "method": "string",
+          "params": "object (optional)"
+        },
+        "specification": "JSON-RPC 2.0",
+        "timestamp": "2024-01-15T10:37:00.000Z"
+      }
+    }
+  }
+}

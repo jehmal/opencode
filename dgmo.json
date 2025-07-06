@@ -1,0 +1,19 @@
+{
+  "$schema": "./packages/opencode/config.schema.json",
+  "mcp": {
+    "qdrant-extended": {
+      "type": "local",
+      "command": [
+        "bash",
+        "-c",
+        "cd /mnt/c/Users/jehma/Desktop/QdrantMCP/mcp-server-qdrant && uv run mcp-server-qdrant"
+      ],
+      "environment": {
+        "QDRANT_URL": "http://localhost:6333",
+        "EMBEDDING_MODEL": "all-MiniLM-L6-v2",
+        "COLLECTION_NAME": "AgentMemories"
+      },
+      "enabled": true
+    }
+  }
+}

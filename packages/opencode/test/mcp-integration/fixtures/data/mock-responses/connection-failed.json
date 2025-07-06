@@ -1,0 +1,23 @@
+{
+  "jsonrpc": "2.0",
+  "id": "connect-2",
+  "error": {
+    "code": -32000,
+    "message": "Connection failed",
+    "data": {
+      "type": "CONNECTION_ERROR",
+      "message": "Failed to establish connection to MCP server",
+      "details": {
+        "reason": "Server not responding",
+        "host": "localhost",
+        "port": 8080,
+        "timeout": 5000,
+        "attempts": 3,
+        "lastError": "ECONNREFUSED",
+        "timestamp": "2024-01-15T10:36:00.000Z"
+      },
+      "retryable": true,
+      "retryAfter": 30
+    }
+  }
+}

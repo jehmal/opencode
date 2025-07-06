@@ -1,0 +1,19 @@
+{
+  "jsonrpc": "2.0",
+  "id": "resource-read-1",
+  "result": {
+    "contents": [
+      {
+        "uri": "file:///test/data/sample.txt",
+        "mimeType": "text/plain",
+        "text": "This is a sample text file.\nIt contains multiple lines of content.\nUsed for testing MCP resource reading functionality.\n\nLine 5: Special characters: !@#$%^&*()\nLine 6: Unicode: 🚀 🌟 ✨\nLine 7: Numbers: 123456789\nLine 8: End of file."
+      }
+    ],
+    "_meta": {
+      "readTime": 23,
+      "fileSize": 234,
+      "encoding": "utf-8",
+      "timestamp": "2024-01-15T10:33:00.000Z"
+    }
+  }
+}

@@ -1,0 +1,35 @@
+{
+  "jsonrpc": "2.0",
+  "id": "connect-1",
+  "result": {
+    "protocolVersion": "2024-11-05",
+    "capabilities": {
+      "logging": {},
+      "prompts": {
+        "listChanged": true
+      },
+      "resources": {
+        "subscribe": true,
+        "listChanged": true
+      },
+      "tools": {
+        "listChanged": true
+      }
+    },
+    "serverInfo": {
+      "name": "test-mcp-server",
+      "version": "1.0.0",
+      "description": "Test MCP server for integration testing",
+      "author": "OpenCode Test Suite",
+      "license": "MIT"
+    },
+    "connectionId": "conn-12345",
+    "sessionId": "sess-67890",
+    "timestamp": "2024-01-15T10:35:00.000Z",
+    "_meta": {
+      "connectionTime": 156,
+      "handshakeComplete": true,
+      "authenticated": true
+    }
+  }
+}

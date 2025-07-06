@@ -1,0 +1,30 @@
+{
+  // Configuration with missing required fields
+  "mcpServers": {
+    "no-command": {
+      // Missing command field
+      "args": ["--help"],
+      "env": {
+        "TEST": "value"
+      }
+    },
+    "no-transport-info": {
+      // Missing both command and url
+      "transport": "websocket"
+    },
+    "incomplete-websocket": {
+      "transport": "websocket"
+      // Missing url field for websocket transport
+    },
+    "incomplete-sse": {
+      "transport": "sse",
+      "headers": {
+        "Authorization": "Bearer token"
+      }
+      // Missing url field for sse transport
+    },
+    "empty-server": {
+      // Completely empty server configuration
+    }
+  }
+}

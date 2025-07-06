@@ -1,0 +1,18 @@
+{
+  "jsonrpc": "2.0",
+  "id": "tool-call-1",
+  "result": {
+    "content": [
+      {
+        "type": "text",
+        "text": "File read successfully. Content: Hello, World!\nThis is a test file for MCP integration testing.\nIt contains multiple lines of text to verify proper file reading functionality."
+      }
+    ],
+    "isError": false,
+    "_meta": {
+      "executionTime": 45,
+      "toolName": "file_read",
+      "timestamp": "2024-01-15T10:30:00.000Z"
+    }
+  }
+}

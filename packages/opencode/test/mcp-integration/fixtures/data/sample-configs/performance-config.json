@@ -1,0 +1,76 @@
+{
+  // Configuration optimized for performance testing
+  "mcpServers": {
+    "high-throughput-server": {
+      "command": "node",
+      "args": ["./servers/performance-server.js"],
+      "env": {
+        "NODE_ENV": "performance",
+        "UV_THREADPOOL_SIZE": "16",
+        "MAX_CONCURRENT_REQUESTS": "1000",
+        "RESPONSE_CACHE_SIZE": "10000",
+        "ENABLE_COMPRESSION": "true"
+      },
+      "performance": {
+        "maxConcurrentRequests": 1000,
+        "requestTimeout": 5000,
+        "keepAliveTimeout": 60000,
+        "maxRequestSize": "1048576",
+        "enableCaching": true,
+        "cacheSize": 10000,
+        "cacheTtl": 300000
+      }
+    },
+    "load-test-websocket": {
+      "url": "ws://localhost:8080/mcp/load-test",
+      "transport": "websocket",
+      "protocols": ["mcp-v1"],
+      "performance": {
+        "maxConcurrentConnections": 100,
+        "connectionPoolSize": 50,
+        "pingInterval": 10000,
+        "pongTimeout": 2000,
+        "reconnectInterval": 1000,
+        "maxReconnectAttempts": 3,
+        "messageQueueSize": 1000,
+        "enableCompression": true
+      }
+    },
+    "batch-processor": {
+      "command": "python3",
+      "args": ["-m", "mcp_batch_processor"],
+      "env": {
+        "BATCH_SIZE": "100",
+        "WORKER_THREADS": "8",
+        "MEMORY_LIMIT": "2048",
+        "ENABLE_PARALLEL_PROCESSING": "true"
+      },
+      "performance": {
+        "batchSize": 100,
+        "maxBatchWaitTime": 1000,
+        "workerThreads": 8,
+        "memoryLimit": "2GB",
+        "enableParallelProcessing": true
+      }
+    }
+  },
+  "performance": {
+    "globalSettings": {
+      "maxTotalConnections": 500,
+      "connectionPoolSize": 100,
+      "requestTimeout": 30000,
+      "keepAliveTimeout": 300000,
+      "enableMetrics": true,
+      "metricsInterval": 5000,
+      "enableProfiling": true,
+      "profilingInterval": 60000
+    },
+    "monitoring": {
+      "enableHealthChecks": true,
+      "healthCheckInterval": 10000,
+      "enableLatencyTracking": true,
+      "enableThroughputTracking": true,
+      "enableErrorRateTracking": true
+    }
+  }
+}

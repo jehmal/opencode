@@ -1,0 +1,76 @@
+{
+  "jsonrpc": "2.0",
+  "id": "tools-list-1",
+  "result": {
+    "tools": [
+      {
+        "name": "file_read",
+        "description": "Read the contents of a file",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "path": {
+              "type": "string",
+              "description": "The file path to read"
+            }
+          },
+          "required": ["path"]
+        }
+      },
+      {
+        "name": "file_write",
+        "description": "Write content to a file",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "path": {
+              "type": "string",
+              "description": "The file path to write to"
+            },
+            "content": {
+              "type": "string",
+              "description": "The content to write"
+            }
+          },
+          "required": ["path", "content"]
+        }
+      },
+      {
+        "name": "execute_command",
+        "description": "Execute a shell command",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "command": {
+              "type": "string",
+              "description": "The command to execute"
+            },
+            "workingDirectory": {
+              "type": "string",
+              "description": "Working directory for command execution"
+            }
+          },
+          "required": ["command"]
+        }
+      },
+      {
+        "name": "search_files",
+        "description": "Search for files matching a pattern",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "pattern": {
+              "type": "string",
+              "description": "Glob pattern to search for"
+            },
+            "directory": {
+              "type": "string",
+              "description": "Directory to search in"
+            }
+          },
+          "required": ["pattern"]
+        }
+      }
+    ]
+  }
+}

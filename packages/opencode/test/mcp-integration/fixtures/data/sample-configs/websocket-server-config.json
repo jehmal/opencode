@@ -1,0 +1,40 @@
+{
+  // Configuration for WebSocket-based MCP servers
+  "mcpServers": {
+    "ws-chat": {
+      "url": "ws://localhost:8765/mcp/chat",
+      "transport": "websocket",
+      "protocols": ["mcp-v1"],
+      "headers": {
+        "Authorization": "Bearer ws-chat-token"
+      },
+      "pingInterval": 30000,
+      "pongTimeout": 5000,
+      "reconnectInterval": 5000,
+      "maxReconnectAttempts": 10
+    },
+    "wss-secure-api": {
+      "url": "wss://secure-api.example.com/mcp",
+      "transport": "websocket",
+      "protocols": ["mcp-v1", "mcp-v2"],
+      "headers": {
+        "Authorization": "Bearer secure-api-token",
+        "X-Client-Version": "1.0.0"
+      },
+      "pingInterval": 60000,
+      "pongTimeout": 10000,
+      "reconnectInterval": 10000,
+      "maxReconnectAttempts": 5,
+      "compression": true
+    },
+    "ws-local-service": {
+      "url": "ws://127.0.0.1:9999/mcp/service",
+      "transport": "websocket",
+      "protocols": ["mcp-v1"],
+      "pingInterval": 15000,
+      "pongTimeout": 3000,
+      "reconnectInterval": 2000,
+      "maxReconnectAttempts": -1
+    }
+  }
+}

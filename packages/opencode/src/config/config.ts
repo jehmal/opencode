@@ -15,7 +15,7 @@ export namespace Config {
 
   export const state = App.state("config", async (app) => {
     let result = await global()
-    for (const file of ["opencode.jsonc", "opencode.json"]) {
+    for (const file of ["dgmo.jsonc", "dgmo.json"]) {
       const found = await Filesystem.findUp(file, app.path.cwd, app.path.root)
       for (const resolved of found.toReversed()) {
         result = mergeDeep(result, await load(resolved))
@@ -245,7 +245,7 @@ export namespace Config {
       .then(async (mod) => {
         const { provider, model, ...rest } = mod.default
         if (provider && model) result.model = `${provider}/${model}`
-        result["$schema"] = "https://opencode.ai/config.json"
+        result["$schema"] = "https://dgmo.ai/config.json"
         result = mergeDeep(result, rest)
         await Bun.write(
           path.join(Global.Path.config, "config.json"),

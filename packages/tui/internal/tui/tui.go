@@ -58,6 +58,7 @@ type appModel struct {
 	interruptKeyState    InterruptKeyState
 	lastScroll           time.Time
 	isCtrlBSequence      bool // Track if Ctrl+B was pressed for multi-key sequences
+	isAltScreen          bool // Track alternate screen state - starts false
 }
 
 func (a appModel) Init() tea.Cmd {
@@ -126,7 +127,24 @@ func (a appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return a, cmd
 		}
 
-		// 2. Check for commands that require leader
+		// 2. Handle alternate screen toggle (Shift+Tab)
+		if keyString == "shift+tab" {
+			a.isAltScreen = !a.isAltScreen
+			var cmd tea.Cmd
+			if a.isAltScreen {
+				cmd = tea.EnterAltScreen
+			} else {
+				cmd = tea.ExitAltScreen
+			}
+			// Show toast notification for user feedback
+			toastMsg := "Fullscreen mode enabled"
+			if !a.isAltScreen {
+				toastMsg = "Fullscreen mode disabled"
+			}
+			return a, tea.Batch(cmd, toast.NewInfoToast(toastMsg))
+		}
+
+		// 3. Check for commands that require leader
 		if a.isLeaderSequence {
 			matches := a.app.Commands.Matches(msg, a.isLeaderSequence)
 			a.isLeaderSequence = false
@@ -135,7 +153,7 @@ func (a appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		}
 
-		// 3. Handle completions trigger
+		// 4. Handle completions trigger
 		if keyString == "/" && !a.showCompletionDialog {
 			a.showCompletionDialog = true
 
@@ -193,7 +211,7 @@ func (a appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return a, tea.Batch(cmds...)
 		}
 
-		// 4. Maximize editor responsiveness for printable characters
+		// 5. Maximize editor responsiveness for printable characters
 		if msg.Text != "" {
 			updated, cmd := a.editor.Update(msg)
 			a.editor = updated.(chat.EditorComponent)
@@ -201,7 +219,7 @@ func (a appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return a, tea.Batch(cmds...)
 		}
 
-		// 5. Check for leader key activation
+		// 6. Check for leader key activation
 		if a.leaderBinding != nil &&
 			!a.isLeaderSequence &&
 			key.Matches(msg, *a.leaderBinding) {
@@ -228,7 +246,7 @@ func (a appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		}
 
-		// 7. Check again for commands that don't require leader (excluding interrupt when busy)
+		// 8. Check again for commands that don't require leader (excluding interrupt when busy)
 		matches := a.app.Commands.Matches(msg, a.isLeaderSequence)
 		if len(matches) > 0 {
 			// Skip interrupt key if we're in debounce mode and app is busy
@@ -238,7 +256,7 @@ func (a appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return a, util.CmdHandler(commands.ExecuteCommandsMsg(matches))
 		}
 
-		// 7. Handle Ctrl+B sequences
+		// 9. Handle Ctrl+B sequences
 		if a.isCtrlBSequence {
 			a.isCtrlBSequence = false
 			switch keyString {
@@ -276,7 +294,7 @@ func (a appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return a, toast.NewInfoToast("Press . for next or , for previous sibling")
 		}
 
-		// 8. Fallback to editor. This is for other characters
+		// 10. Fallback to editor. This is for other characters
 		// like backspace, tab, etc.
 		updatedEditor, cmd := a.editor.Update(msg)
 		a.editor = updatedEditor.(chat.EditorComponent)
@@ -858,6 +876,7 @@ func NewModel(app *app.App) tea.Model {
 		showCompletionDialog: false,
 		toastManager:         toast.NewToastManager(),
 		interruptKeyState:    InterruptKeyIdle,
+		isAltScreen:          false, // Start with alt screen disabled (normal terminal mode)
 	}
 
 	return model

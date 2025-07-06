@@ -1,0 +1,12 @@
+{
+  // Basic MCP configuration with a single server
+  "mcpServers": {
+    "filesystem": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-filesystem", "/tmp"],
+      "env": {
+        "NODE_ENV": "development"
+      }
+    }
+  }
+}

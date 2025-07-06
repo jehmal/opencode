@@ -1,0 +1,32 @@
+{
+  "jsonrpc": "2.0",
+  "id": "timeout-1",
+  "error": {
+    "code": -32001,
+    "message": "Request timeout",
+    "data": {
+      "type": "TIMEOUT_ERROR",
+      "message": "Request timed out after 30000ms",
+      "details": {
+        "timeoutMs": 30000,
+        "elapsedMs": 30001,
+        "method": "tools/call",
+        "toolName": "slow_operation",
+        "requestId": "timeout-1",
+        "timestamp": "2024-01-15T10:38:00.000Z",
+        "serverLoad": {
+          "cpu": 85.2,
+          "memory": 78.5,
+          "activeRequests": 12
+        }
+      },
+      "retryable": true,
+      "retryAfter": 60,
+      "suggestions": [
+        "Increase timeout value",
+        "Retry with exponential backoff",
+        "Check server performance"
+      ]
+    }
+  }
+}

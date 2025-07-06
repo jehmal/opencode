@@ -5,6 +5,7 @@ import { RunCommand } from "./cli/cmd/run"
 import { GenerateCommand } from "./cli/cmd/generate"
 import { Log } from "./util/log"
 import { AuthCommand } from "./cli/cmd/auth"
+import { McpCommand } from "./cli/cmd/mcp"
 import { UpgradeCommand } from "./cli/cmd/upgrade"
 import { ModelsCommand } from "./cli/cmd/models"
 import { UI } from "./cli/ui"
@@ -31,7 +32,7 @@ process.on("uncaughtException", (e) => {
 })
 
 const cli = yargs(hideBin(process.argv))
-  .scriptName("opencode")
+  .scriptName("dgmo")
   .help("help", "show help")
   .version("version", "show version number", Installation.VERSION)
   .alias("version", "v")
@@ -41,7 +42,7 @@ const cli = yargs(hideBin(process.argv))
   })
   .middleware(async () => {
     await Log.init({ print: process.argv.includes("--print-logs") })
-    Log.Default.info("opencode", {
+    Log.Default.info("dgmo", {
       version: Installation.VERSION,
       args: process.argv.slice(2),
     })
@@ -52,6 +53,7 @@ const cli = yargs(hideBin(process.argv))
   .command(GenerateCommand)
   .command(DebugCommand)
   .command(AuthCommand)
+  .command(McpCommand)
   .command(UpgradeCommand)
   .command(ServeCommand)
   .command(ModelsCommand)
@@ -85,15 +87,16 @@ try {
     })
   }
 
-  if (e instanceof ResolveMessage) {
+  // Handle Bun-specific ResolveMessage errors
+  if (e && typeof e === 'object' && 'code' in e && 'specifier' in e) {
     Object.assign(data, {
-      name: e.name,
-      message: e.message,
-      code: e.code,
-      specifier: e.specifier,
-      referrer: e.referrer,
-      position: e.position,
-      importKind: e.importKind,
+      name: (e as any).name,
+      message: (e as any).message,
+      code: (e as any).code,
+      specifier: (e as any).specifier,
+      referrer: (e as any).referrer,
+      position: (e as any).position,
+      importKind: (e as any).importKind,
     })
   }
   Log.Default.error("fatal", data)

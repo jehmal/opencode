@@ -1,0 +1,42 @@
+{
+  "jsonrpc": "2.0",
+  "id": "resources-list-1",
+  "result": {
+    "resources": [
+      {
+        "uri": "file:///test/data/sample.txt",
+        "name": "Sample Text File",
+        "description": "A sample text file for testing resource access",
+        "mimeType": "text/plain"
+      },
+      {
+        "uri": "file:///test/data/config.json",
+        "name": "Configuration File",
+        "description": "JSON configuration file for testing",
+        "mimeType": "application/json"
+      },
+      {
+        "uri": "file:///test/data/image.png",
+        "name": "Test Image",
+        "description": "PNG image file for testing binary resource handling",
+        "mimeType": "image/png"
+      },
+      {
+        "uri": "memory://cache/session-1",
+        "name": "Session Cache",
+        "description": "In-memory session data",
+        "mimeType": "application/json"
+      },
+      {
+        "uri": "http://api.example.com/data",
+        "name": "External API Data",
+        "description": "Data from external API endpoint",
+        "mimeType": "application/json"
+      }
+    ],
+    "_meta": {
+      "totalCount": 5,
+      "timestamp": "2024-01-15T10:32:00.000Z"
+    }
+  }
+}

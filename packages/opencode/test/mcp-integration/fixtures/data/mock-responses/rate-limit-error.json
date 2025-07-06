@@ -1,0 +1,30 @@
+{
+  "jsonrpc": "2.0",
+  "id": "rate-limit-1",
+  "error": {
+    "code": -32002,
+    "message": "Rate limit exceeded",
+    "data": {
+      "type": "RATE_LIMIT_ERROR",
+      "message": "Too many requests: 100 requests per minute limit exceeded",
+      "details": {
+        "limit": 100,
+        "window": "1m",
+        "current": 101,
+        "resetTime": "2024-01-15T10:40:00.000Z",
+        "retryAfter": 45,
+        "clientId": "client-12345",
+        "endpoint": "tools/call",
+        "timestamp": "2024-01-15T10:39:15.000Z"
+      },
+      "retryable": true,
+      "retryAfter": 45,
+      "headers": {
+        "X-RateLimit-Limit": "100",
+        "X-RateLimit-Remaining": "0",
+        "X-RateLimit-Reset": "1705315200",
+        "X-RateLimit-Window": "60"
+      }
+    }
+  }
+}

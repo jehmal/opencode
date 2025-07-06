@@ -1,0 +1,25 @@
+{
+  "jsonrpc": "2.0",
+  "id": "tool-call-2",
+  "result": {
+    "content": [
+      {
+        "type": "text",
+        "text": "Error: File not found at path '/nonexistent/file.txt'"
+      }
+    ],
+    "isError": true,
+    "_meta": {
+      "executionTime": 12,
+      "toolName": "file_read",
+      "timestamp": "2024-01-15T10:31:00.000Z",
+      "errorCode": "FILE_NOT_FOUND",
+      "errorDetails": {
+        "path": "/nonexistent/file.txt",
+        "errno": -2,
+        "code": "ENOENT",
+        "syscall": "open"
+      }
+    }
+  }
+}
