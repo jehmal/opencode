@@ -198,6 +198,23 @@ export const TaskTool = Tool.define({
       Session.abort(subSession.id)
     })
     try {
+      Debug.log("[TASK] Starting Session.chat execution", {
+        subSessionId: subSession.id,
+        modelID: metadata.modelID,
+        providerID: metadata.providerID,
+        promptLength: params.prompt.length,
+      })
+
+      // Emit immediate progress to show we're starting execution
+      emitTaskProgress({
+        sessionID: ctx.sessionID,
+        taskID,
+        progress: 15,
+        message: "Starting agent execution...",
+        timestamp: Date.now(),
+        startTime: startTime,
+      })
+
       const result = await Session.chat({
         sessionID: subSession.id,
         modelID: metadata.modelID,
@@ -209,6 +226,13 @@ export const TaskTool = Tool.define({
           },
         ],
       })
+
+      Debug.log("[TASK] Session.chat completed successfully", {
+        subSessionId: subSession.id,
+        resultPartsCount: result.parts.length,
+        hasTextOutput: result.parts.some((p) => p.type === "text"),
+      })
+
       unsub()
 
       // Extract text output for summary
@@ -239,15 +263,32 @@ export const TaskTool = Tool.define({
         output,
       }
     } catch (error) {
-      // Mark sub-session as failed
-      await SubSession.fail(
-        subSession.id,
-        error instanceof Error ? error.message : String(error),
-      )
-
-      // Emit task failed event
       const errorMessage =
         error instanceof Error ? error.message : String(error)
+      const errorStack = error instanceof Error ? error.stack : undefined
+
+      Debug.error("[TASK] Session.chat failed", {
+        subSessionId: subSession.id,
+        error: errorMessage,
+        stack: errorStack,
+        modelID: metadata.modelID,
+        providerID: metadata.providerID,
+      })
+
+      // Emit immediate failure progress
+      emitTaskProgress({
+        sessionID: ctx.sessionID,
+        taskID,
+        progress: 0,
+        message: `Failed: ${errorMessage}`,
+        timestamp: Date.now(),
+        startTime: startTime,
+      })
+
+      // Mark sub-session as failed
+      await SubSession.fail(subSession.id, errorMessage)
+
+      // Emit task failed event with more context
       emitTaskFailed({
         sessionID: ctx.sessionID,
         taskID,

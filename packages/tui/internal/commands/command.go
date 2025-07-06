@@ -83,6 +83,7 @@ const (
 	ProjectInitCommand          CommandName = "project_init"
 	AgentModeCommand            CommandName = "agent_mode"
 	SubSessionCommand           CommandName = "sub_session"
+	ContinuationPromptCommand   CommandName = "continuation_prompt"
 	InputClearCommand           CommandName = "input_clear"
 	InputPasteCommand           CommandName = "input_paste"
 	InputSubmitCommand          CommandName = "input_submit"
@@ -203,6 +204,12 @@ func LoadFromConfig(config *opencode.Config) CommandRegistry {
 			Description: "navigate sub-sessions",
 			Keybindings: parseBindings("<leader>u"),
 			Trigger:     "sub-session",
+		},
+		{
+			Name:        ContinuationPromptCommand,
+			Description: "generate continuation prompt for agent handoff",
+			Keybindings: parseBindings("<leader>p"),
+			Trigger:     "continue",
 		},
 		{
 			Name:        InputClearCommand,

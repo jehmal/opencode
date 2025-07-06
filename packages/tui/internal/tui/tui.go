@@ -2,8 +2,10 @@ package tui
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log/slog"
+	"net/http"
 	"os"
 	"os/exec"
 	"strings"
@@ -17,6 +19,7 @@ import (
 	"github.com/sst/dgmo/internal/commands"
 	"github.com/sst/dgmo/internal/completions"
 	"github.com/sst/dgmo/internal/components/chat"
+	"github.com/sst/dgmo/internal/components/clipboard"
 	cmdcomp "github.com/sst/dgmo/internal/components/commands"
 	"github.com/sst/dgmo/internal/components/dialog"
 	"github.com/sst/dgmo/internal/components/modal"
@@ -42,6 +45,21 @@ const (
 
 const interruptDebounceTimeout = 1 * time.Second
 
+// ContinuationPromptProgressMsg is sent when continuation prompt generation makes progress
+type ContinuationPromptProgressMsg struct {
+	TaskID   string
+	Progress int
+	Message  string
+}
+
+// ContinuationPromptCompletedMsg is sent when continuation prompt generation completes
+type ContinuationPromptCompletedMsg struct {
+	TaskID   string
+	Prompt   string
+	Duration time.Duration
+	Error    error
+}
+
 type appModel struct {
 	width, height        int
 	app                  *app.App
@@ -55,6 +73,7 @@ type appModel struct {
 	leaderBinding        *key.Binding
 	isLeaderSequence     bool
 	toastManager         *toast.ToastManager
+	clipboardManager     *clipboard.ClipboardManager
 	interruptKeyState    InterruptKeyState
 	lastScroll           time.Time
 	isCtrlBSequence      bool // Track if Ctrl+B was pressed for multi-key sequences
@@ -472,6 +491,10 @@ func (a appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		tm, cmd := a.toastManager.Update(msg)
 		a.toastManager = tm
 		cmds = append(cmds, cmd)
+	case toast.UpdateToastMsg:
+		tm, cmd := a.toastManager.Update(msg)
+		a.toastManager = tm
+		cmds = append(cmds, cmd)
 	case InterruptDebounceTimeoutMsg:
 		// Reset interrupt key state after timeout
 		a.interruptKeyState = InterruptKeyIdle
@@ -479,16 +502,160 @@ func (a appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case app.TaskStartedMsg:
 		// Task started - update progress to 0
 		chat.UpdateTaskProgress(msg.Task.ID, 0)
+		// Check if this is a continuation prompt task
+		if strings.HasPrefix(msg.Task.ID, "continuation-") {
+			// Don't show generic task toast for continuation prompts
+			// The /continue command already shows initial toast
+		} else {
+			// Show toast notification for task start
+			cmds = append(cmds, toast.NewInfoToast(
+				fmt.Sprintf("Task started: %s", msg.Task.Description),
+				toast.WithTitle("🚀 Task Progress"),
+				toast.WithDuration(3*time.Second),
+			))
+		}
 	case app.TaskProgressMsg:
 		// Update task progress
 		chat.UpdateTaskProgress(msg.TaskID, msg.Progress)
+		// Check if this is a continuation prompt task
+		if strings.HasPrefix(msg.TaskID, "continuation-") {
+			// Convert to ContinuationPromptProgressMsg for special handling
+			cmds = append(cmds, func() tea.Msg {
+				return ContinuationPromptProgressMsg{
+					TaskID:   msg.TaskID,
+					Progress: msg.Progress,
+					Message:  msg.Message,
+				}
+			})
+		} else {
+			// Show progress toast notification with visual progress bar
+			progressMsg := "Task progress"
+			if msg.Message != "" {
+				progressMsg = msg.Message
+			}
+			cmds = append(cmds, toast.NewProgressToast(
+				progressMsg,
+				msg.Progress,
+				toast.WithTitle("⏳ Progress Update"),
+				toast.WithDuration(3*time.Second),
+			))
+		}
 	case app.TaskCompletedMsg:
 		// Task completed - set progress to 100
 		chat.UpdateTaskProgress(msg.TaskID, 100)
+		// Check if this is a continuation prompt task
+		if strings.HasPrefix(msg.TaskID, "continuation-") {
+			// For continuation prompt tasks, we need to get the actual prompt
+			// Since we don't have it in TaskCompletedMsg, just show success
+			// The actual prompt was already handled by the HTTP response
+			return a, nil
+		}
+		// Show completion notification with statistics
+		completionMsg := "Task completed successfully"
+		if msg.Summary != "" {
+			completionMsg = fmt.Sprintf("Task completed: %s", msg.Summary)
+		}
+		durationStr := fmt.Sprintf("Duration: %v", msg.Duration.Round(time.Millisecond))
+
+		if msg.Success {
+			cmds = append(cmds, toast.NewSuccessToast(
+				fmt.Sprintf("%s (%s)", completionMsg, durationStr),
+				toast.WithTitle("✅ Task Complete"),
+				toast.WithDuration(5*time.Second),
+			))
+		} else {
+			cmds = append(cmds, toast.NewWarningToast(
+				fmt.Sprintf("Task finished with issues (%s)", durationStr),
+				toast.WithTitle("⚠️ Task Complete"),
+				toast.WithDuration(5*time.Second),
+			))
+		}
 	case app.TaskFailedMsg:
-		// Task failed - could show error state
-		// For now, just log it
+		// Task failed - show error toast
+		errorMsg := fmt.Sprintf("Task failed: %s", msg.Error)
+		if msg.Recoverable {
+			errorMsg += " (recoverable)"
+		}
+		cmds = append(cmds, toast.NewErrorToast(
+			errorMsg,
+			toast.WithTitle("❌ Task Failed"),
+			toast.WithDuration(7*time.Second),
+		))
 		slog.Warn("Task failed", "taskID", msg.TaskID, "error", msg.Error)
+	case app.ConnectionStatusMsg:
+		// Handle connection status changes
+		switch msg.Status {
+		case "connected":
+			cmds = append(cmds, toast.NewSuccessToast("Connected to task server"))
+		case "connecting":
+			cmds = append(cmds, toast.NewInfoToast("Connecting to task server..."))
+		case "reconnecting":
+			cmds = append(cmds, toast.NewWarningToast("Reconnecting to task server..."))
+		case "disconnected":
+			cmds = append(cmds, toast.NewWarningToast("Disconnected from task server"))
+		case "failed":
+			cmds = append(cmds, toast.NewErrorToast(msg.Message))
+		}
+
+		// Update status component with connection info
+		a.status.SetConnectionStatus(msg.Status, msg.IsHealthy)
+	case ContinuationPromptProgressMsg:
+		// Update the existing toast with progress
+		// Extract session ID from taskID format: "continuation-{sessionID}-{timestamp}"
+		parts := strings.Split(msg.TaskID, "-")
+		sessionID := ""
+		if len(parts) >= 3 {
+			sessionID = parts[1]
+		}
+		toastID := fmt.Sprintf("continuation-toast-%s", sessionID)
+		cmds = append(cmds, toast.NewProgressToast(
+			msg.Message,
+			msg.Progress,
+			toast.WithID(toastID),
+			toast.WithTitle("🔄 Agent Handoff"),
+			toast.WithDuration(5*time.Second),
+		))
+	case ContinuationPromptCompletedMsg:
+		// Handle completion of continuation prompt generation
+		if msg.Error != nil {
+			slog.Error("Continuation prompt generation failed", "error", msg.Error)
+			cmds = append(cmds, toast.NewErrorToast(
+				fmt.Sprintf("Failed to generate prompt: %v", msg.Error),
+				toast.WithTitle("❌ Generation Failed"),
+				toast.WithDuration(7*time.Second),
+			))
+		} else {
+			// Create a new session for the continuation
+			session, err := a.app.CreateSession(context.Background())
+			if err != nil {
+				slog.Error("Failed to create new session", "error", err)
+				cmds = append(cmds, toast.NewErrorToast("Failed to create new session for continuation"))
+				return a, tea.Batch(cmds...)
+			}
+			
+			// Switch to the new session
+			a.app.Session = session
+			a.app.Messages = []opencode.Message{}
+			cmds = append(cmds, util.CmdHandler(app.SessionSelectedMsg(session)))
+			cmds = append(cmds, util.CmdHandler(app.SessionClearedMsg{}))
+			
+			// Calculate prompt stats
+			lines := strings.Count(msg.Prompt, "\n") + 1
+			words := len(strings.Fields(msg.Prompt))
+			
+			// Show success toast with statistics
+			successMsg := fmt.Sprintf("New session created! Continuing work... (%d lines, %d words)", 
+				lines, words)
+			
+			cmds = append(cmds, toast.NewSuccessToast(
+				successMsg,
+				toast.WithTitle("✅ Handoff Ready"),
+				toast.WithDuration(5*time.Second),
+			))
+			
+			// Send the continuation prompt as the first message in the new session
+			cmds = append(cmds, a.app.SendChatMessage(context.Background(), msg.Prompt, []app.Attachment{}))
+		}
 	}
 
 	// update status bar
@@ -778,6 +945,86 @@ func (a appModel) executeCommand(command commands.Command) (tea.Model, tea.Cmd) 
 		a.modal = themeDialog
 	case commands.ProjectInitCommand:
 		cmds = append(cmds, a.app.InitializeProject(context.Background()))
+	case commands.ContinuationPromptCommand:
+		if a.app.Session == nil || a.app.Session.ID == "" {
+			return a, toast.NewErrorToast("No active session to generate continuation prompt")
+		}
+
+		// Step 1: Show immediate feedback that command was triggered
+		// Show initial toast with longer duration and a specific ID
+		toastID := fmt.Sprintf("continuation-toast-%s", a.app.Session.ID)
+		cmds = append(cmds, toast.NewInfoToast(
+			"Generating continuation prompt...",
+			toast.WithID(toastID),
+			toast.WithTitle("🔄 Agent Handoff"),
+			toast.WithDuration(30*time.Second), // Keep it visible longer
+		))
+
+		// Step 2: Start the generation process with beautiful progress feedback
+		cmds = append(cmds, func() tea.Msg {
+			// Make direct HTTP request since SDK doesn't have this method yet
+			serverURL := os.Getenv("DGMO_SERVER")
+			if serverURL == "" {
+				slog.Error("DGMO_SERVER environment variable not set")
+				return toast.NewErrorToast("Server URL not configured")
+			}
+			
+			// Start time for duration tracking
+			startTime := time.Now()
+
+			url := fmt.Sprintf("%s/session/%s/continuation-prompt", serverURL, a.app.Session.ID)
+			req, err := http.NewRequestWithContext(context.Background(), "POST", url, strings.NewReader("{}"))
+			if err != nil {
+				slog.Error("Failed to create continuation prompt request", "error", err)
+				return ContinuationPromptCompletedMsg{
+					TaskID:   a.app.Session.ID,
+					Error:    fmt.Errorf("failed to create request: %w", err),
+					Duration: time.Since(startTime),
+				}
+			}
+			req.Header.Set("Content-Type", "application/json")
+
+			client := &http.Client{Timeout: 30 * time.Second}
+			resp, err := client.Do(req)
+			if err != nil {
+				slog.Error("Failed to generate continuation prompt", "error", err)
+				return ContinuationPromptCompletedMsg{
+					TaskID:   a.app.Session.ID,
+					Error:    fmt.Errorf("network error: %w", err),
+					Duration: time.Since(startTime),
+				}
+			}
+			defer resp.Body.Close()
+
+			if resp.StatusCode != 200 {
+				slog.Error("Continuation prompt request failed", "status", resp.StatusCode)
+				return ContinuationPromptCompletedMsg{
+					TaskID:   a.app.Session.ID,
+					Error:    fmt.Errorf("server error (status %d)", resp.StatusCode),
+					Duration: time.Since(startTime),
+				}
+			}
+
+			var response struct {
+				Prompt string `json:"prompt"`
+			}
+			if err := json.NewDecoder(resp.Body).Decode(&response); err != nil {
+				slog.Error("Failed to decode continuation prompt response", "error", err)
+				return ContinuationPromptCompletedMsg{
+					TaskID:   a.app.Session.ID,
+					Error:    fmt.Errorf("failed to parse response: %w", err),
+					Duration: time.Since(startTime),
+				}
+			}
+
+			// Step 3: Send completion message
+			return ContinuationPromptCompletedMsg{
+				TaskID:   a.app.Session.ID,
+				Prompt:   response.Prompt,
+				Duration: time.Since(startTime),
+				Error:    nil,
+			}
+		})
 	case commands.InputClearCommand:
 		if a.editor.Value() == "" {
 			return a, nil

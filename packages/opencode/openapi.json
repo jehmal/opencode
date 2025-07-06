@@ -465,6 +465,9 @@
                       "createdAt": {
                         "type": "number"
                       },
+                      "startedAt": {
+                        "type": "number"
+                      },
                       "completedAt": {
                         "type": "number"
                       },
@@ -538,6 +541,9 @@
                       "createdAt": {
                         "type": "number"
                       },
+                      "startedAt": {
+                        "type": "number"
+                      },
                       "completedAt": {
                         "type": "number"
                       },
@@ -599,6 +605,9 @@
                         ]
                       },
                       "createdAt": {
+                        "type": "number"
+                      },
+                      "startedAt": {
                         "type": "number"
                       },
                       "completedAt": {
@@ -670,6 +679,9 @@
                       ]
                     },
                     "createdAt": {
+                      "type": "number"
+                    },
+                    "startedAt": {
                       "type": "number"
                     },
                     "completedAt": {
@@ -801,6 +813,339 @@
         ],
         "description": "Search for files"
       }
+    },
+    "/session/{id}/continuation-prompt": {
+      "post": {
+        "responses": {
+          "200": {
+            "description": "Generated continuation prompt",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "prompt": {
+                      "type": "string"
+                    },
+                    "projectState": {
+                      "type": "object",
+                      "properties": {
+                        "projectName": {
+                          "type": "string"
+                        },
+                        "projectGoal": {
+                          "type": "string"
+                        },
+                        "completionPercentage": {
+                          "type": "number",
+                          "minimum": 0,
+                          "maximum": 100
+                        },
+                        "workingDirectory": {
+                          "type": "string"
+                        },
+                        "completedComponents": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "name": {
+                                "type": "string"
+                              },
+                              "description": {
+                                "type": "string"
+                              },
+                              "filePath": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "name",
+                              "description"
+                            ]
+                          }
+                        },
+                        "remainingTasks": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "name": {
+                                "type": "string"
+                              },
+                              "description": {
+                                "type": "string"
+                              },
+                              "priority": {
+                                "type": "string",
+                                "enum": [
+                                  "high",
+                                  "medium",
+                                  "low"
+                                ]
+                              },
+                              "dependencies": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string"
+                                }
+                              }
+                            },
+                            "required": [
+                              "name",
+                              "description",
+                              "priority"
+                            ]
+                          }
+                        },
+                        "criticalFiles": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "path": {
+                                "type": "string"
+                              },
+                              "description": {
+                                "type": "string"
+                              },
+                              "lineNumbers": {
+                                "type": "array",
+                                "items": {
+                                  "type": "number"
+                                }
+                              }
+                            },
+                            "required": [
+                              "path",
+                              "description"
+                            ]
+                          }
+                        },
+                        "knownIssues": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "issue": {
+                                "type": "string"
+                              },
+                              "solution": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "issue",
+                              "solution"
+                            ]
+                          }
+                        },
+                        "architecturalConstraints": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "successCriteria": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "testingApproach": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        }
+                      },
+                      "required": [
+                        "projectName",
+                        "projectGoal",
+                        "completionPercentage",
+                        "workingDirectory",
+                        "completedComponents",
+                        "remainingTasks",
+                        "criticalFiles",
+                        "knownIssues",
+                        "architecturalConstraints",
+                        "successCriteria",
+                        "testingApproach"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "prompt",
+                    "projectState"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "operationId": "postSessionByIdContinuation-prompt",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "schema": {
+              "type": "string",
+              "description": "Session ID"
+            },
+            "required": true
+          }
+        ],
+        "description": "Generate continuation prompt for agent handoff",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "projectName": {
+                    "type": "string"
+                  },
+                  "projectGoal": {
+                    "type": "string"
+                  },
+                  "completionPercentage": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 100
+                  },
+                  "workingDirectory": {
+                    "type": "string"
+                  },
+                  "completedComponents": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "name": {
+                          "type": "string"
+                        },
+                        "description": {
+                          "type": "string"
+                        },
+                        "filePath": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "name",
+                        "description"
+                      ]
+                    }
+                  },
+                  "remainingTasks": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "name": {
+                          "type": "string"
+                        },
+                        "description": {
+                          "type": "string"
+                        },
+                        "priority": {
+                          "type": "string",
+                          "enum": [
+                            "high",
+                            "medium",
+                            "low"
+                          ]
+                        },
+                        "dependencies": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        }
+                      },
+                      "required": [
+                        "name",
+                        "description",
+                        "priority"
+                      ]
+                    }
+                  },
+                  "criticalFiles": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "path": {
+                          "type": "string"
+                        },
+                        "description": {
+                          "type": "string"
+                        },
+                        "lineNumbers": {
+                          "type": "array",
+                          "items": {
+                            "type": "number"
+                          }
+                        }
+                      },
+                      "required": [
+                        "path",
+                        "description"
+                      ]
+                    }
+                  },
+                  "knownIssues": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "issue": {
+                          "type": "string"
+                        },
+                        "solution": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "issue",
+                        "solution"
+                      ]
+                    }
+                  },
+                  "architecturalConstraints": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "successCriteria": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "testingApproach": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -814,6 +1159,12 @@
             "$ref": "#/components/schemas/Event.installation.updated"
           },
           {
+            "$ref": "#/components/schemas/Event.message.updated"
+          },
+          {
+            "$ref": "#/components/schemas/Event.message.part.updated"
+          },
+          {
             "$ref": "#/components/schemas/Event.lsp.client.diagnostics"
           },
           {
@@ -821,12 +1172,6 @@
           },
           {
             "$ref": "#/components/schemas/Event.file.edited"
-          },
-          {
-            "$ref": "#/components/schemas/Event.message.updated"
-          },
-          {
-            "$ref": "#/components/schemas/Event.message.part.updated"
           },
           {
             "$ref": "#/components/schemas/Event.session.updated"
@@ -846,11 +1191,11 @@
           "mapping": {
             "storage.write": "#/components/schemas/Event.storage.write",
             "installation.updated": "#/components/schemas/Event.installation.updated",
+            "message.updated": "#/components/schemas/Event.message.updated",
+            "message.part.updated": "#/components/schemas/Event.message.part.updated",
             "lsp.client.diagnostics": "#/components/schemas/Event.lsp.client.diagnostics",
             "permission.updated": "#/components/schemas/Event.permission.updated",
             "file.edited": "#/components/schemas/Event.file.edited",
-            "message.updated": "#/components/schemas/Event.message.updated",
-            "message.part.updated": "#/components/schemas/Event.message.part.updated",
             "session.updated": "#/components/schemas/Event.session.updated",
             "session.deleted": "#/components/schemas/Event.session.deleted",
             "session.idle": "#/components/schemas/Event.session.idle",
@@ -899,110 +1244,6 @@
             },
             "required": [
               "version"
-            ]
-          }
-        },
-        "required": [
-          "type",
-          "properties"
-        ]
-      },
-      "Event.lsp.client.diagnostics": {
-        "type": "object",
-        "properties": {
-          "type": {
-            "type": "string",
-            "const": "lsp.client.diagnostics"
-          },
-          "properties": {
-            "type": "object",
-            "properties": {
-              "serverID": {
-                "type": "string"
-              },
-              "path": {
-                "type": "string"
-              }
-            },
-            "required": [
-              "serverID",
-              "path"
-            ]
-          }
-        },
-        "required": [
-          "type",
-          "properties"
-        ]
-      },
-      "Event.permission.updated": {
-        "type": "object",
-        "properties": {
-          "type": {
-            "type": "string",
-            "const": "permission.updated"
-          },
-          "properties": {
-            "$ref": "#/components/schemas/permission.info"
-          }
-        },
-        "required": [
-          "type",
-          "properties"
-        ]
-      },
-      "permission.info": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string"
-          },
-          "sessionID": {
-            "type": "string"
-          },
-          "title": {
-            "type": "string"
-          },
-          "metadata": {
-            "type": "object",
-            "additionalProperties": {}
-          },
-          "time": {
-            "type": "object",
-            "properties": {
-              "created": {
-                "type": "number"
-              }
-            },
-            "required": [
-              "created"
-            ]
-          }
-        },
-        "required": [
-          "id",
-          "sessionID",
-          "title",
-          "metadata",
-          "time"
-        ]
-      },
-      "Event.file.edited": {
-        "type": "object",
-        "properties": {
-          "type": {
-            "type": "string",
-            "const": "file.edited"
-          },
-          "properties": {
-            "type": "object",
-            "properties": {
-              "file": {
-                "type": "string"
-              }
-            },
-            "required": [
-              "file"
             ]
           }
         },
@@ -1329,7 +1570,32 @@
           "error": {
             "oneOf": [
               {
-                "$ref": "#/components/schemas/ProviderAuthError"
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "const": "ProviderAuthError"
+                  },
+                  "data": {
+                    "type": "object",
+                    "properties": {
+                      "providerID": {
+                        "type": "string"
+                      },
+                      "message": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "providerID",
+                      "message"
+                    ]
+                  }
+                },
+                "required": [
+                  "name",
+                  "data"
+                ]
               },
               {
                 "$ref": "#/components/schemas/UnknownError"
@@ -1337,15 +1603,7 @@
               {
                 "$ref": "#/components/schemas/MessageOutputLengthError"
               }
-            ],
-            "discriminator": {
-              "propertyName": "name",
-              "mapping": {
-                "ProviderAuthError": "#/components/schemas/ProviderAuthError",
-                "UnknownError": "#/components/schemas/UnknownError",
-                "MessageOutputLengthError": "#/components/schemas/MessageOutputLengthError"
-              }
-            }
+            ]
           },
           "sessionID": {
             "type": "string"
@@ -1469,34 +1727,6 @@
           "tool"
         ]
       },
-      "ProviderAuthError": {
-        "type": "object",
-        "properties": {
-          "name": {
-            "type": "string",
-            "const": "ProviderAuthError"
-          },
-          "data": {
-            "type": "object",
-            "properties": {
-              "providerID": {
-                "type": "string"
-              },
-              "message": {
-                "type": "string"
-              }
-            },
-            "required": [
-              "providerID",
-              "message"
-            ]
-          }
-        },
-        "required": [
-          "name",
-          "data"
-        ]
-      },
       "UnknownError": {
         "type": "object",
         "properties": {
@@ -1561,6 +1791,110 @@
               "part",
               "sessionID",
               "messageID"
+            ]
+          }
+        },
+        "required": [
+          "type",
+          "properties"
+        ]
+      },
+      "Event.lsp.client.diagnostics": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "lsp.client.diagnostics"
+          },
+          "properties": {
+            "type": "object",
+            "properties": {
+              "serverID": {
+                "type": "string"
+              },
+              "path": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "serverID",
+              "path"
+            ]
+          }
+        },
+        "required": [
+          "type",
+          "properties"
+        ]
+      },
+      "Event.permission.updated": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "permission.updated"
+          },
+          "properties": {
+            "$ref": "#/components/schemas/permission.info"
+          }
+        },
+        "required": [
+          "type",
+          "properties"
+        ]
+      },
+      "permission.info": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "sessionID": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "metadata": {
+            "type": "object",
+            "additionalProperties": {}
+          },
+          "time": {
+            "type": "object",
+            "properties": {
+              "created": {
+                "type": "number"
+              }
+            },
+            "required": [
+              "created"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "sessionID",
+          "title",
+          "metadata",
+          "time"
+        ]
+      },
+      "Event.file.edited": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "file.edited"
+          },
+          "properties": {
+            "type": "object",
+            "properties": {
+              "file": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "file"
             ]
           }
         },
@@ -1705,7 +2039,32 @@
               "error": {
                 "oneOf": [
                   {
-                    "$ref": "#/components/schemas/ProviderAuthError"
+                    "type": "object",
+                    "properties": {
+                      "name": {
+                        "type": "string",
+                        "const": "ProviderAuthError"
+                      },
+                      "data": {
+                        "type": "object",
+                        "properties": {
+                          "providerID": {
+                            "type": "string"
+                          },
+                          "message": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "providerID",
+                          "message"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "name",
+                      "data"
+                    ]
                   },
                   {
                     "$ref": "#/components/schemas/UnknownError"
@@ -1713,15 +2072,7 @@
                   {
                     "$ref": "#/components/schemas/MessageOutputLengthError"
                   }
-                ],
-                "discriminator": {
-                  "propertyName": "name",
-                  "mapping": {
-                    "ProviderAuthError": "#/components/schemas/ProviderAuthError",
-                    "UnknownError": "#/components/schemas/UnknownError",
-                    "MessageOutputLengthError": "#/components/schemas/MessageOutputLengthError"
-                  }
-                }
+                ]
               }
             }
           }

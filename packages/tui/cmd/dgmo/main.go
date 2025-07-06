@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"log/slog"
 	"os"
@@ -85,9 +86,11 @@ func main() {
 	// Initialize task client with event handlers
 	taskClient := app.NewTaskClient(app.TaskEventHandlers{
 		OnTaskStarted: func(task app.TaskInfo) {
+			slog.Info("TUI received task started event", "taskID", task.ID, "description", task.Description)
 			program.Send(app.TaskStartedMsg{Task: task})
 		},
 		OnTaskProgress: func(taskID string, progress int, message string) {
+			slog.Info("TUI received task progress event", "taskID", taskID, "progress", progress, "message", message)
 			program.Send(app.TaskProgressMsg{
 				TaskID:   taskID,
 				Progress: progress,
@@ -95,6 +98,7 @@ func main() {
 			})
 		},
 		OnTaskCompleted: func(taskID string, duration time.Duration, success bool, summary string) {
+			slog.Info("TUI received task completed event", "taskID", taskID, "success", success, "duration", duration)
 			program.Send(app.TaskCompletedMsg{
 				TaskID:   taskID,
 				Duration: duration,
@@ -103,6 +107,7 @@ func main() {
 			})
 		},
 		OnTaskFailed: func(taskID string, error string, recoverable bool) {
+			slog.Info("TUI received task failed event", "taskID", taskID, "error", error, "recoverable", recoverable)
 			program.Send(app.TaskFailedMsg{
 				TaskID:      taskID,
 				Error:       error,
@@ -111,14 +116,63 @@ func main() {
 		},
 	})
 
-	// Connect to task event server
-	if err := taskClient.Connect(); err != nil {
-		slog.Warn("Failed to connect to task event server", "error", err)
-		// Don't fail, just continue without task progress
-	} else {
-		app_.TaskClient = taskClient
-		defer taskClient.Disconnect()
-	}
+	// Set up connection status handler for UI feedback
+	taskClient.SetStatusHandler(func(state app.ConnectionState, err error) {
+		switch state {
+		case app.StateConnected:
+			program.Send(app.ConnectionStatusMsg{
+				Status:    "connected",
+				Message:   "Connected to task event server",
+				IsHealthy: true,
+			})
+		case app.StateConnecting:
+			program.Send(app.ConnectionStatusMsg{
+				Status:    "connecting",
+				Message:   "Connecting to task event server...",
+				IsHealthy: false,
+			})
+		case app.StateReconnecting:
+			program.Send(app.ConnectionStatusMsg{
+				Status:    "reconnecting",
+				Message:   "Reconnecting to task event server...",
+				IsHealthy: false,
+			})
+		case app.StateDisconnected:
+			program.Send(app.ConnectionStatusMsg{
+				Status:    "disconnected",
+				Message:   "Disconnected from task event server",
+				IsHealthy: false,
+			})
+		case app.StateFailed:
+			errMsg := "Connection failed"
+			if err != nil {
+				errMsg = fmt.Sprintf("Connection failed: %v", err)
+			}
+			program.Send(app.ConnectionStatusMsg{
+				Status:    "failed",
+				Message:   errMsg,
+				IsHealthy: false,
+			})
+		}
+	})
+
+	// Connect to task event server with graceful degradation
+	app_.TaskClient = taskClient
+	defer taskClient.Disconnect()
+
+	// Attempt connection in background to avoid blocking startup
+	go func() {
+		slog.Info("TUI attempting to connect to WebSocket server...")
+		if err := taskClient.Connect(); err != nil {
+			slog.Error("TUI failed to connect to task event server", "error", err)
+			// Application continues to work without task progress
+		} else {
+			slog.Info("TUI successfully connected to WebSocket server")
+			// Log connection stats
+			stats := taskClient.GetConnectionStats()
+			slog.Info("TUI WebSocket connection stats", "stats", stats)
+		}
+	}()
 
 	go func() {
 		stream := httpClient.Event.ListStreaming(ctx)

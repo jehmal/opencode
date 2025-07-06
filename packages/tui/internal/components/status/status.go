@@ -14,18 +14,21 @@ import (
 type StatusComponent interface {
 	tea.Model
 	tea.ViewModel
+	SetConnectionStatus(status string, isHealthy bool)
 }
 
 type statusComponent struct {
-	app   *app.App
-	width int
+	app               *app.App
+	width             int
+	connectionStatus  string
+	connectionHealthy bool
 }
 
-func (m statusComponent) Init() tea.Cmd {
+func (m *statusComponent) Init() tea.Cmd {
 	return nil
 }
 
-func (m statusComponent) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+func (m *statusComponent) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
@@ -76,7 +79,7 @@ func formatTokensAndCost(tokens float64, contextWindow float64, cost float64) st
 	return fmt.Sprintf("Context: %s (%d%%), Cost: %s", formattedTokens, int(percentage), formattedCost)
 }
 
-func (m statusComponent) View() string {
+func (m *statusComponent) View() string {
 	t := theme.CurrentTheme()
 	if m.app.Session == nil || m.app.Session.ID == "" {
 		return styles.NewStyle().
@@ -87,6 +90,7 @@ func (m statusComponent) View() string {
 	}
 
 	logo := m.logo()
+	connectionIndicator := m.connectionStatusIndicator()
 
 	cwd := styles.NewStyle().
 		Foreground(t.TextMuted()).
@@ -127,19 +131,61 @@ func (m statusComponent) View() string {
 
 	space := max(
 		0,
-		m.width-lipgloss.Width(logo)-lipgloss.Width(cwd)-lipgloss.Width(sessionInfo),
+		m.width-lipgloss.Width(logo)-lipgloss.Width(cwd)-lipgloss.Width(connectionIndicator)-lipgloss.Width(sessionInfo),
 	)
 	spacer := styles.NewStyle().Background(t.BackgroundPanel()).Width(space).Render("")
 
-	status := logo + cwd + spacer + sessionInfo
+	status := logo + cwd + spacer + connectionIndicator + sessionInfo
 
 	blank := styles.NewStyle().Background(t.Background()).Width(m.width).Render("")
 	return blank + "\n" + status
 }
 
+// SetConnectionStatus updates the connection status display
+func (m *statusComponent) SetConnectionStatus(status string, isHealthy bool) {
+	m.connectionStatus = status
+	m.connectionHealthy = isHealthy
+}
+
+// connectionStatusIndicator returns a styled connection status indicator
+func (m statusComponent) connectionStatusIndicator() string {
+	if m.connectionStatus == "" {
+		return ""
+	}
+
+	t := theme.CurrentTheme()
+	var indicator string
+	var color = t.TextMuted() // Initialize with a default value to infer type
+
+	switch m.connectionStatus {
+	case "connected":
+		indicator = "●"
+		color = t.Success()
+	case "connecting", "reconnecting":
+		indicator = "◐"
+		color = t.Warning()
+	case "disconnected":
+		indicator = "○"
+		color = t.TextMuted()
+	case "failed":
+		indicator = "●"
+		color = t.Error()
+	default:
+		indicator = "?"
+		color = t.TextMuted()
+	}
+
+	return styles.NewStyle().
+		Foreground(color).
+		Background(t.BackgroundElement()).
+		Render(indicator)
+}
+
 func NewStatusCmp(app *app.App) StatusComponent {
 	statusComponent := &statusComponent{
-		app: app,
+		app:               app,
+		connectionStatus:  "disconnected",
+		connectionHealthy: false,
 	}
 
 	return statusComponent

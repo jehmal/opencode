@@ -15,6 +15,7 @@ import (
 
 // ShowToastMsg is a message to display a toast notification
 type ShowToastMsg struct {
+	ID       string // Optional ID for updating the toast later
 	Message  string
 	Title    *string
 	Color    compat.AdaptiveColor
@@ -26,6 +27,14 @@ type DismissToastMsg struct {
 	ID string
 }
 
+// UpdateToastMsg is a message to update an existing toast
+type UpdateToastMsg struct {
+	ID       string
+	Message  string
+	Title    *string
+	Progress *int
+}
+
 // Toast represents a single toast notification
 type Toast struct {
 	ID        string
@@ -34,6 +43,8 @@ type Toast struct {
 	Color     compat.AdaptiveColor
 	CreatedAt time.Time
 	Duration  time.Duration
+	Progress  *int   // For progress toasts
+	TaskID    string // For tracking task-related toasts
 }
 
 // ToastManager manages multiple toast notifications
@@ -57,8 +68,14 @@ func (tm *ToastManager) Init() tea.Cmd {
 func (tm *ToastManager) Update(msg tea.Msg) (*ToastManager, tea.Cmd) {
 	switch msg := msg.(type) {
 	case ShowToastMsg:
+		// Use provided ID or generate a new one
+		id := msg.ID
+		if id == "" {
+			id = fmt.Sprintf("toast-%d", time.Now().UnixNano())
+		}
+		
 		toast := Toast{
-			ID:        fmt.Sprintf("toast-%d", time.Now().UnixNano()),
+			ID:        id,
 			Title:     msg.Title,
 			Message:   msg.Message,
 			Color:     msg.Color,
@@ -81,6 +98,34 @@ func (tm *ToastManager) Update(msg tea.Msg) (*ToastManager, tea.Cmd) {
 			}
 		}
 		tm.toasts = newToasts
+	case UpdateToastMsg:
+		// Update existing toast
+		var cmds []tea.Cmd
+		for i, t := range tm.toasts {
+			if t.ID == msg.ID {
+				// Update message with progress if provided
+				if msg.Progress != nil {
+					tm.toasts[i].Progress = msg.Progress
+					progressBar := renderProgressBar(*msg.Progress, 20)
+					tm.toasts[i].Message = fmt.Sprintf("%s\n%s", msg.Message, progressBar)
+				} else {
+					tm.toasts[i].Message = msg.Message
+				}
+				if msg.Title != nil {
+					tm.toasts[i].Title = msg.Title
+				}
+				// Reset the duration to keep it visible
+				tm.toasts[i].Duration = 30 * time.Second
+				tm.toasts[i].CreatedAt = time.Now()
+				
+				// Cancel previous dismiss timer and set a new one
+				cmds = append(cmds, tea.Tick(tm.toasts[i].Duration, func(t time.Time) tea.Msg {
+					return DismissToastMsg{ID: msg.ID}
+				}))
+				break
+			}
+		}
+		return tm, tea.Batch(cmds...)
 	}
 
 	return tm, nil
@@ -109,11 +154,21 @@ func (tm *ToastManager) renderSingleToast(toast Toast) string {
 
 	// Wrap message text
 	messageStyle := styles.NewStyle()
-	contentWidth := lipgloss.Width(toast.Message)
+
+	// If this is a progress toast, add the progress bar
+	var fullMessage string
+	if toast.Progress != nil {
+		progressBar := renderProgressBar(*toast.Progress, 20)
+		fullMessage = fmt.Sprintf("%s\n%s", toast.Message, progressBar)
+	} else {
+		fullMessage = toast.Message
+	}
+
+	contentWidth := lipgloss.Width(fullMessage)
 	if contentWidth > contentMaxWidth {
 		messageStyle = messageStyle.Width(contentMaxWidth)
 	}
-	content.WriteString(messageStyle.Render(toast.Message))
+	content.WriteString(messageStyle.Render(fullMessage))
 
 	// Render toast with max width
 	return baseStyle.MaxWidth(maxWidth).Render(content.String())
@@ -186,6 +241,7 @@ type ToastOptions struct {
 }
 
 type toastOptions struct {
+	id       *string
 	title    *string
 	duration *time.Duration
 	color    *compat.AdaptiveColor
@@ -210,6 +266,13 @@ func WithColor(color compat.AdaptiveColor) ToastOption {
 	}
 }
 
+// WithID sets a specific ID for the toast
+func WithID(id string) ToastOption {
+	return func(t *toastOptions) {
+		t.id = &id
+	}
+}
+
 func NewToast(message string, options ...ToastOption) tea.Cmd {
 	t := theme.CurrentTheme()
 	duration := 5 * time.Second
@@ -224,7 +287,12 @@ func NewToast(message string, options ...ToastOption) tea.Cmd {
 	}
 
 	return func() tea.Msg {
+		id := ""
+		if opts.id != nil {
+			id = *opts.id
+		}
 		return ShowToastMsg{
+			ID:       id,
 			Message:  message,
 			Title:    opts.title,
 			Duration: *opts.duration,
@@ -263,4 +331,33 @@ func NewErrorToast(message string, options ...ToastOption) tea.Cmd {
 		message,
 		options...,
 	)
+}
+
+// NewProgressToast creates a toast with a progress bar
+func NewProgressToast(message string, progress int, options ...ToastOption) tea.Cmd {
+	// Create a visual progress bar
+	progressBar := renderProgressBar(progress, 20)
+	fullMessage := fmt.Sprintf("%s\n%s", message, progressBar)
+
+	options = append(options, WithColor(theme.CurrentTheme().Info()))
+	return NewToast(
+		fullMessage,
+		options...,
+	)
+}
+
+// renderProgressBar creates a visual progress bar
+func renderProgressBar(progress int, width int) string {
+	if progress < 0 {
+		progress = 0
+	}
+	if progress > 100 {
+		progress = 100
+	}
+
+	filled := (progress * width) / 100
+	empty := width - filled
+
+	bar := strings.Repeat("█", filled) + strings.Repeat("░", empty)
+	return fmt.Sprintf("[%s] %d%%", bar, progress)
 }

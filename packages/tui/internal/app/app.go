@@ -74,7 +74,13 @@ type SessionSwitchedMsg struct {
 type NavigateBackMsg struct{}
 
 type NavigateToSiblingMsg struct {
-	Direction string // "next" or "prev"
+	Direction int // -1 for previous, 1 for next
+}
+
+type ConnectionStatusMsg struct {
+	Status    string // "connected", "connecting", "reconnecting", "disconnected", "failed"
+	Message   string
+	IsHealthy bool
 }
 
 func New(

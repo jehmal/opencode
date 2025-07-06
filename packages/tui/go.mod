@@ -26,7 +26,6 @@ require golang.org/x/exp v0.0.0-20250305212735-054e65f0b394 // indirect
 require (
 	dario.cat/mergo v1.0.2 // indirect
 	github.com/atombender/go-jsonschema v0.20.0 // indirect
-	github.com/charmbracelet/harmonica v0.2.0 // indirect
 	github.com/charmbracelet/lipgloss v1.1.1-0.20250404203927-76690c660834 // indirect
 	github.com/charmbracelet/x/exp/slice v0.0.0-20250327172914-2fdc97757edf // indirect
 	github.com/charmbracelet/x/input v0.3.5-0.20250424101541-abb4d9a9b197 // indirect

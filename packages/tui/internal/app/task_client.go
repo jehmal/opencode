@@ -5,22 +5,84 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"math"
+	"math/rand"
+	"net"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/gorilla/websocket"
 )
 
+// ConnectionState represents the current connection state
+type ConnectionState int32
+
+const (
+	StateDisconnected ConnectionState = iota
+	StateConnecting
+	StateConnected
+	StateReconnecting
+	StateFailed
+)
+
+func (s ConnectionState) String() string {
+	switch s {
+	case StateDisconnected:
+		return "disconnected"
+	case StateConnecting:
+		return "connecting"
+	case StateConnected:
+		return "connected"
+	case StateReconnecting:
+		return "reconnecting"
+	case StateFailed:
+		return "failed"
+	default:
+		return "unknown"
+	}
+}
+
+// RetryConfig holds configuration for connection retry logic
+type RetryConfig struct {
+	MaxRetries     int
+	BaseDelay      time.Duration
+	MaxDelay       time.Duration
+	BackoffFactor  float64
+	JitterEnabled  bool
+	ServerCheckURL string
+}
+
+// DefaultRetryConfig returns sensible defaults for retry configuration
+func DefaultRetryConfig() RetryConfig {
+	return RetryConfig{
+		MaxRetries:     10,
+		BaseDelay:      1 * time.Second,
+		MaxDelay:       30 * time.Second,
+		BackoffFactor:  2.0,
+		JitterEnabled:  true,
+		ServerCheckURL: "http://localhost:5747/health",
+	}
+}
+
 // TaskClient manages WebSocket connection for task events
 type TaskClient struct {
-	url       string
-	conn      *websocket.Conn
-	mu        sync.RWMutex
-	tasks     map[string]*TaskInfo
-	handlers  TaskEventHandlers
-	reconnect bool
-	ctx       context.Context
-	cancel    context.CancelFunc
+	url           string
+	conn          *websocket.Conn
+	mu            sync.RWMutex
+	tasks         map[string]*TaskInfo
+	handlers      TaskEventHandlers
+	reconnect     bool
+	ctx           context.Context
+	cancel        context.CancelFunc
+	state         int32 // atomic access to ConnectionState
+	retryConfig   RetryConfig
+	retryCount    int32
+	lastHeartbeat time.Time
+	heartbeatMu   sync.RWMutex
+	eventQueue    []TaskEvent
+	queueMu       sync.Mutex
+	statusHandler func(ConnectionState, error)
 }
 
 // TaskEventHandlers contains callbacks for task events
@@ -79,33 +141,234 @@ type TaskFailedData struct {
 func NewTaskClient(handlers TaskEventHandlers) *TaskClient {
 	ctx, cancel := context.WithCancel(context.Background())
 	return &TaskClient{
-		url:       "ws://localhost:5747",
-		tasks:     make(map[string]*TaskInfo),
-		handlers:  handlers,
-		reconnect: true,
-		ctx:       ctx,
-		cancel:    cancel,
+		url:         "ws://localhost:5747",
+		tasks:       make(map[string]*TaskInfo),
+		handlers:    handlers,
+		reconnect:   true,
+		ctx:         ctx,
+		cancel:      cancel,
+		state:       int32(StateDisconnected),
+		retryConfig: DefaultRetryConfig(),
+		eventQueue:  make([]TaskEvent, 0),
 	}
 }
 
-// Connect establishes WebSocket connection
-func (tc *TaskClient) Connect() error {
+// SetStatusHandler sets a callback for connection status changes
+func (tc *TaskClient) SetStatusHandler(handler func(ConnectionState, error)) {
 	tc.mu.Lock()
 	defer tc.mu.Unlock()
+	tc.statusHandler = handler
+}
 
-	if tc.conn != nil {
+// GetConnectionState returns the current connection state
+func (tc *TaskClient) GetConnectionState() ConnectionState {
+	return ConnectionState(atomic.LoadInt32(&tc.state))
+}
+
+// setState atomically updates the connection state and notifies handlers
+func (tc *TaskClient) setState(newState ConnectionState, err error) {
+	oldState := ConnectionState(atomic.SwapInt32(&tc.state, int32(newState)))
+	if oldState != newState {
+		slog.Info("Connection state changed", "from", oldState, "to", newState)
+		tc.mu.RLock()
+		handler := tc.statusHandler
+		tc.mu.RUnlock()
+		if handler != nil {
+			go handler(newState, err)
+		}
+	}
+}
+
+// isServerReady checks if the server is ready to accept connections
+func (tc *TaskClient) isServerReady() bool {
+	// Try both IPv4 and IPv6 connections
+	addresses := []string{"127.0.0.1:5747", "[::1]:5747", "localhost:5747"}
+	
+	var lastErr error
+	for _, addr := range addresses {
+		client := &net.Dialer{Timeout: 2 * time.Second}
+		conn, err := client.Dial("tcp", addr)
+		if err != nil {
+			lastErr = err
+			slog.Debug("TCP connection failed", "address", addr, "error", err)
+			continue
+		}
+		conn.Close()
+		slog.Debug("TCP connection successful", "address", addr)
+		return true
+	}
+	
+	slog.Debug("All TCP connection attempts failed", "last_error", lastErr)
+	return false
+}
+
+// calculateBackoffDelay calculates the delay for the next retry attempt
+func (tc *TaskClient) calculateBackoffDelay(attempt int) time.Duration {
+	if attempt <= 0 {
+		return tc.retryConfig.BaseDelay
+	}
+
+	delay := float64(tc.retryConfig.BaseDelay) * math.Pow(tc.retryConfig.BackoffFactor, float64(attempt-1))
+
+	if delay > float64(tc.retryConfig.MaxDelay) {
+		delay = float64(tc.retryConfig.MaxDelay)
+	}
+
+	// Add jitter to prevent thundering herd
+	if tc.retryConfig.JitterEnabled {
+		jitter := delay * 0.1 * (2*rand.Float64() - 1) // ±10% jitter
+		delay += jitter
+	}
+
+	return time.Duration(delay)
+}
+
+// Connect establishes WebSocket connection with retry logic
+func (tc *TaskClient) Connect() error {
+	return tc.ConnectWithRetry(true)
+}
+
+// ConnectWithRetry establishes WebSocket connection with optional retry logic
+func (tc *TaskClient) ConnectWithRetry(enableRetry bool) error {
+	// Check connection state without holding lock for long operations
+	tc.mu.RLock()
+	isConnected := tc.conn != nil && tc.GetConnectionState() == StateConnected
+	tc.mu.RUnlock()
+	
+	if isConnected {
 		return nil // Already connected
 	}
 
-	conn, _, err := websocket.DefaultDialer.Dial(tc.url, nil)
-	if err != nil {
-		return fmt.Errorf("failed to connect to task event server: %w", err)
+	tc.setState(StateConnecting, nil)
+
+	// Wait for server to be ready if this is the first connection attempt
+	// Do this WITHOUT holding the mutex to avoid blocking other operations
+	if atomic.LoadInt32(&tc.retryCount) == 0 {
+		slog.Info("Waiting for WebSocket server to be ready...")
+		for i := 0; i < 60; i++ { // Increased to 60 seconds
+			if tc.isServerReady() {
+				slog.Info("WebSocket server is ready", "elapsed_seconds", i)
+				break
+			}
+			if i%10 == 0 && i > 0 {
+				slog.Info("Still waiting for server...", "elapsed", fmt.Sprintf("%ds", i))
+			}
+			time.Sleep(1 * time.Second)
+		}
+		
+		// Final check before attempting connection
+		if !tc.isServerReady() {
+			slog.Warn("Server not ready after 60 seconds, attempting connection anyway")
+		}
 	}
 
-	tc.conn = conn
-	go tc.readLoop()
-	slog.Info("Connected to task event server", "url", tc.url)
-	return nil
+	var lastErr error
+	maxRetries := 1
+	if enableRetry {
+		maxRetries = tc.retryConfig.MaxRetries
+	}
+
+	for attempt := 0; attempt < maxRetries; attempt++ {
+		if attempt > 0 {
+			tc.setState(StateReconnecting, lastErr)
+			delay := tc.calculateBackoffDelay(attempt)
+			slog.Info("Retrying connection", "attempt", attempt+1, "delay", delay)
+
+			select {
+			case <-time.After(delay):
+			case <-tc.ctx.Done():
+				tc.setState(StateDisconnected, tc.ctx.Err())
+				return tc.ctx.Err()
+			}
+		}
+
+		// Check if server is ready before attempting connection
+		if !tc.isServerReady() {
+			lastErr = fmt.Errorf("server not ready")
+			continue
+		}
+
+		dialer := websocket.Dialer{
+			HandshakeTimeout: 10 * time.Second,
+			ReadBufferSize:   1024,
+			WriteBufferSize:  1024,
+		}
+
+		slog.Info("Attempting WebSocket connection", "url", tc.url, "attempt", attempt+1)
+		conn, resp, err := dialer.Dial(tc.url, nil)
+		if err != nil {
+			lastErr = err
+			atomic.AddInt32(&tc.retryCount, 1)
+			slog.Warn("Connection attempt failed", "attempt", attempt+1, "error", err, "response", resp)
+			continue
+		}
+
+		// Connection successful - acquire lock only for setting connection
+		tc.mu.Lock()
+		tc.conn = conn
+		tc.mu.Unlock()
+		
+		atomic.StoreInt32(&tc.retryCount, 0)
+		tc.setState(StateConnected, nil)
+		tc.updateHeartbeat()
+
+		// Process any queued events
+		go tc.processQueuedEvents()
+
+		// Start reading messages
+		go tc.readLoop()
+
+		slog.Info("Connected to task event server", "url", tc.url, "attempts", attempt+1)
+		return nil
+	}
+
+	// All retry attempts failed
+	tc.setState(StateFailed, lastErr)
+	return fmt.Errorf("failed to connect after %d attempts: %w", maxRetries, lastErr)
+}
+
+// updateHeartbeat updates the last heartbeat timestamp
+func (tc *TaskClient) updateHeartbeat() {
+	tc.heartbeatMu.Lock()
+	defer tc.heartbeatMu.Unlock()
+	tc.lastHeartbeat = time.Now()
+}
+
+// getLastHeartbeat returns the last heartbeat timestamp
+func (tc *TaskClient) getLastHeartbeat() time.Time {
+	tc.heartbeatMu.RLock()
+	defer tc.heartbeatMu.RUnlock()
+	return tc.lastHeartbeat
+}
+
+// isConnectionHealthy checks if the connection is healthy based on heartbeat
+func (tc *TaskClient) isConnectionHealthy() bool {
+	if tc.GetConnectionState() != StateConnected {
+		return false
+	}
+
+	lastHeartbeat := tc.getLastHeartbeat()
+	if lastHeartbeat.IsZero() {
+		return true // No heartbeat received yet, assume healthy
+	}
+
+	return time.Since(lastHeartbeat) < 60*time.Second // 60 second timeout
+}
+
+// processQueuedEvents processes any events that were queued while disconnected
+func (tc *TaskClient) processQueuedEvents() {
+	tc.queueMu.Lock()
+	events := make([]TaskEvent, len(tc.eventQueue))
+	copy(events, tc.eventQueue)
+	tc.eventQueue = tc.eventQueue[:0] // Clear the queue
+	tc.queueMu.Unlock()
+
+	if len(events) > 0 {
+		slog.Info("Processing queued events", "count", len(events))
+		for _, event := range events {
+			tc.handleEvent(event)
+		}
+	}
 }
 
 // Disconnect closes the WebSocket connection
@@ -115,10 +378,39 @@ func (tc *TaskClient) Disconnect() {
 
 	tc.reconnect = false
 	tc.cancel()
+	tc.setState(StateDisconnected, nil)
 
 	if tc.conn != nil {
 		tc.conn.Close()
 		tc.conn = nil
+	}
+
+	slog.Info("Disconnected from task event server")
+}
+
+// IsConnected returns whether the client is currently connected
+func (tc *TaskClient) IsConnected() bool {
+	return tc.GetConnectionState() == StateConnected
+}
+
+// GetConnectionStats returns connection statistics
+func (tc *TaskClient) GetConnectionStats() map[string]interface{} {
+	tc.mu.RLock()
+	defer tc.mu.RUnlock()
+
+	tc.queueMu.Lock()
+	queueSize := len(tc.eventQueue)
+	tc.queueMu.Unlock()
+
+	lastHeartbeat := tc.getLastHeartbeat()
+
+	return map[string]interface{}{
+		"state":          tc.GetConnectionState().String(),
+		"retry_count":    atomic.LoadInt32(&tc.retryCount),
+		"queue_size":     queueSize,
+		"last_heartbeat": lastHeartbeat,
+		"is_healthy":     tc.isConnectionHealthy(),
+		"url":            tc.url,
 	}
 }
 
@@ -130,9 +422,10 @@ func (tc *TaskClient) GetTask(taskID string) (*TaskInfo, bool) {
 	return task, ok
 }
 
-// readLoop handles incoming WebSocket messages
+// readLoop handles incoming WebSocket messages with enhanced error handling
 func (tc *TaskClient) readLoop() {
 	defer func() {
+		tc.setState(StateDisconnected, nil)
 		tc.mu.Lock()
 		if tc.conn != nil {
 			tc.conn.Close()
@@ -140,14 +433,32 @@ func (tc *TaskClient) readLoop() {
 		}
 		tc.mu.Unlock()
 
-		// Attempt reconnection if enabled
-		if tc.reconnect {
-			time.Sleep(5 * time.Second)
-			if err := tc.Connect(); err != nil {
-				slog.Error("Failed to reconnect to task event server", "error", err)
-			}
+		// Attempt reconnection if enabled and not shutting down
+		if tc.reconnect && tc.ctx.Err() == nil {
+			go func() {
+				delay := tc.calculateBackoffDelay(int(atomic.LoadInt32(&tc.retryCount)))
+				slog.Info("Scheduling reconnection", "delay", delay)
+
+				select {
+				case <-time.After(delay):
+					if err := tc.Connect(); err != nil {
+						slog.Error("Failed to reconnect to task event server", "error", err)
+					}
+				case <-tc.ctx.Done():
+					return
+				}
+			}()
 		}
 	}()
+
+	// Set connection timeout
+	tc.mu.RLock()
+	conn := tc.conn
+	tc.mu.RUnlock()
+
+	if conn != nil {
+		conn.SetReadDeadline(time.Now().Add(70 * time.Second)) // Slightly longer than heartbeat interval
+	}
 
 	for {
 		select {
@@ -167,12 +478,42 @@ func (tc *TaskClient) readLoop() {
 			if err != nil {
 				if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
 					slog.Error("WebSocket read error", "error", err)
+					tc.setState(StateDisconnected, err)
 				}
 				return
 			}
 
+			// Reset read deadline after successful read
+			conn.SetReadDeadline(time.Now().Add(70 * time.Second))
+
+			// Handle heartbeat events specially
+			if event.Type == "heartbeat" {
+				tc.updateHeartbeat()
+				continue
+			}
+
+			// If we're not connected, queue the event
+			if tc.GetConnectionState() != StateConnected {
+				tc.queueEvent(event)
+				continue
+			}
+
 			tc.handleEvent(event)
 		}
+	}
+}
+
+// queueEvent adds an event to the queue for later processing
+func (tc *TaskClient) queueEvent(event TaskEvent) {
+	tc.queueMu.Lock()
+	defer tc.queueMu.Unlock()
+
+	// Limit queue size to prevent memory issues
+	if len(tc.eventQueue) < 1000 {
+		tc.eventQueue = append(tc.eventQueue, event)
+		slog.Debug("Event queued", "type", event.Type, "queue_size", len(tc.eventQueue))
+	} else {
+		slog.Warn("Event queue full, dropping event", "type", event.Type)
 	}
 }
 
@@ -279,7 +620,8 @@ func (tc *TaskClient) handleEvent(event TaskEvent) {
 		}()
 
 	case "heartbeat":
-		// Ignore heartbeat messages
+		tc.updateHeartbeat()
+		slog.Debug("Heartbeat received")
 	default:
 		slog.Warn("Unknown task event type", "type", event.Type)
 	}

@@ -1,4 +1,3 @@
-import { Debug } from "../util/debug"
 import { Log } from "../util/log"
 import { Bus } from "../bus"
 import { describeRoute, generateSpecs, openAPISpecs } from "hono-openapi"
@@ -16,6 +15,16 @@ import { NamedError } from "../util/error"
 import { ModelsDev } from "../provider/models"
 import { Ripgrep } from "../file/ripgrep"
 import { Config } from "../config/config"
+import {
+  continuationPromptGenerator,
+  ProjectStateSchema,
+} from "../session/continuation-prompt-generator"
+import {
+  emitTaskStarted,
+  emitTaskProgress,
+  emitTaskCompleted,
+  emitTaskFailed,
+} from "../events/task-events"
 
 const ERRORS = {
   400: {
@@ -108,9 +117,19 @@ export namespace Server {
               data: JSON.stringify({}),
             })
             const unsub = Bus.subscribeAll(async (event) => {
-              await stream.writeSSE({
-                data: JSON.stringify(event),
-              })
+              try {
+                await stream.writeSSE({
+                  data: JSON.stringify(event),
+                })
+              } catch (error) {
+                log.error(
+                  "SSE write failed",
+                  error instanceof Error
+                    ? { message: error.message, stack: error.stack }
+                    : { error },
+                )
+                // Don't throw - let the connection continue for other events
+              }
             })
             await new Promise<void>((resolve) => {
               stream.onAbort(() => {
@@ -654,6 +673,269 @@ export namespace Server {
             limit: 10,
           })
           return c.json(result)
+        },
+      )
+      .post(
+        "/session/:id/continuation-prompt",
+        describeRoute({
+          description: "Generate continuation prompt for agent handoff",
+          responses: {
+            200: {
+              description: "Generated continuation prompt",
+              content: {
+                "application/json": {
+                  schema: resolver(
+                    z.object({
+                      prompt: z.string(),
+                      projectState: ProjectStateSchema,
+                    }),
+                  ),
+                },
+              },
+            },
+            ...ERRORS,
+          },
+        }),
+        zValidator(
+          "param",
+          z.object({
+            id: z.string().openapi({ description: "Session ID" }),
+          }),
+        ),
+        zValidator(
+          "json",
+          ProjectStateSchema.partial().extend({
+            // Allow partial project state, will be filled with defaults
+            projectName: z.string().optional(),
+            projectGoal: z.string().optional(),
+          }),
+        ),
+        async (c) => {
+          const sessionID = c.req.valid("param").id
+          const partialState = c.req.valid("json")
+          const startTime = Date.now()
+          const taskID = `continuation-${sessionID}-${startTime}`
+
+          // Emit task started event
+          emitTaskStarted({
+            sessionID,
+            taskID,
+            agentName: "Continuation Generator",
+            taskDescription: "Generating continuation prompt for agent handoff",
+            timestamp: startTime,
+          })
+
+          try {
+            // Get session info to extract project context
+            await Session.get(sessionID) // Verify session exists
+            const app = App.info()
+
+            // Emit progress event
+            emitTaskProgress({
+              sessionID,
+              taskID,
+              progress: 25,
+              message: "Analyzing project state...",
+              timestamp: Date.now(),
+              startTime,
+            })
+
+            // Build complete project state with defaults
+            const projectState = {
+              projectName: partialState.projectName || "opencode",
+              projectGoal:
+                partialState.projectGoal || "AI coding assistant development",
+              completionPercentage: partialState.completionPercentage || 75,
+              workingDirectory: partialState.workingDirectory || app.path.cwd,
+              completedComponents: partialState.completedComponents || [
+                {
+                  name: "Continuation Prompt System",
+                  description:
+                    "Vector memory integration with prompting techniques",
+                  filePath: "src/session/continuation-prompt-generator.ts",
+                },
+                {
+                  name: "Server API Integration",
+                  description: "REST endpoint for prompt generation",
+                  filePath: "src/server/server.ts",
+                },
+              ],
+              remainingTasks: partialState.remainingTasks || [
+                {
+                  name: "TUI Slash Command",
+                  description: "Implement /continue command in Go TUI client",
+                  priority: "high" as const,
+                  dependencies: ["Server endpoint"],
+                },
+                {
+                  name: "Error Handling",
+                  description:
+                    "Add comprehensive error handling and user feedback",
+                  priority: "medium" as const,
+                },
+              ],
+              criticalFiles: partialState.criticalFiles || [
+                {
+                  path: "src/server/server.ts",
+                  description: "Main server with API endpoints",
+                },
+                {
+                  path: "src/session/continuation-prompt-generator.ts",
+                  description: "Core prompt generation logic",
+                },
+              ],
+              knownIssues: partialState.knownIssues || [
+                {
+                  issue: "Complex metadata arrays fail in vector storage",
+                  solution: "Use structured text in information field only",
+                },
+              ],
+              architecturalConstraints:
+                partialState.architecturalConstraints || [
+                  "Maintain TypeScript/Bun runtime compatibility",
+                  "Follow existing Zod validation patterns",
+                  "Integrate with MCP server architecture",
+                  "Preserve session state management",
+                ],
+              successCriteria: partialState.successCriteria || [
+                "/continue command responds within 2 seconds",
+                "Generated prompts follow template structure",
+                "Memory searches return relevant context",
+                "TUI displays formatted output with copy functionality",
+              ],
+              testingApproach: partialState.testingApproach || [
+                "Test /continue command end-to-end",
+                "Validate prompt generation quality",
+                "Verify memory search integration",
+                "Check TUI display formatting",
+              ],
+            }
+
+            // Emit progress event for generation
+            emitTaskProgress({
+              sessionID,
+              taskID,
+              progress: 75,
+              message: "Generating continuation prompt...",
+              timestamp: Date.now(),
+              startTime,
+            })
+
+            // Generate the continuation prompt
+            const prompt =
+              continuationPromptGenerator.generateContinuationPrompt(
+                projectState,
+              )
+
+            // Emit completion event
+            emitTaskCompleted({
+              sessionID,
+              taskID,
+              duration: Date.now() - startTime,
+              success: true,
+              summary: `Generated continuation prompt (${prompt.length} characters)`,
+              timestamp: Date.now(),
+            })
+
+            return c.json({
+              prompt,
+              projectState,
+            })
+          } catch (error) {
+            // Emit failure event
+            const errorMessage =
+              error instanceof Error ? error.message : String(error)
+            emitTaskFailed({
+              sessionID,
+              taskID,
+              error: errorMessage,
+              recoverable: true,
+              timestamp: Date.now(),
+            })
+
+            log.error("continuation-prompt-error", {
+              sessionID,
+              error: errorMessage,
+              stack: error instanceof Error ? error.stack : undefined,
+            })
+
+            throw error
+          }
+        },
+      )
+      .get(
+        "/events/diagnostics",
+        describeRoute({
+          description: "Get task event diagnostics information",
+          responses: {
+            200: {
+              description: "Event diagnostics data",
+              content: {
+                "application/json": {
+                  schema: resolver(
+                    z.object({
+                      eventCounts: z.object({
+                        started: z.number(),
+                        progress: z.number(),
+                        completed: z.number(),
+                        failed: z.number(),
+                      }),
+                      lastEvents: z.record(z.any()),
+                      websocketClients: z.number(),
+                    }),
+                  ),
+                },
+              },
+            },
+          },
+        }),
+        async (c) => {
+          const { taskEventDiagnostics } = await import(
+            "../events/task-events/diagnostics"
+          )
+          const { taskEventServer } = await import(
+            "../events/task-events/server"
+          )
+          
+          const stats = taskEventDiagnostics.getStats()
+          
+          return c.json({
+            ...stats,
+            websocketClients: (taskEventServer as any).clients?.size || 0,
+          })
+        },
+      )
+      .post(
+        "/events/test",
+        describeRoute({
+          description: "Test task event flow",
+          responses: {
+            200: {
+              description: "Test completed",
+              content: {
+                "application/json": {
+                  schema: resolver(
+                    z.object({
+                      success: z.boolean(),
+                      message: z.string(),
+                    }),
+                  ),
+                },
+              },
+            },
+          },
+        }),
+        async (c) => {
+          const { taskEventDiagnostics } = await import(
+            "../events/task-events/diagnostics"
+          )
+          
+          await taskEventDiagnostics.testEventFlow()
+          
+          return c.json({
+            success: true,
+            message: "Event flow test completed. Check logs for details.",
+          })
         },
       )
 
