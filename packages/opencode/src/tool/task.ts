@@ -46,7 +46,7 @@ export const TaskTool = Tool.define({
     Debug.log("[TASK] Context sessionID:", ctx.sessionID)
     Debug.log("[TASK] Creating sub-session with parent:", ctx.sessionID)
     Debug.log("[TASK] Current working directory:", process.cwd())
-    
+
     // Simple debug log to file
     try {
       const { logTaskExecution } = await import("./task-debug")
@@ -54,7 +54,7 @@ export const TaskTool = Tool.define({
     } catch (e) {
       Debug.error("[TASK] Debug log failed:", e)
     }
-    
+
     // Import App to get paths
     const { App } = await import("../app/app")
     const appInfo = App.info()
@@ -74,52 +74,63 @@ export const TaskTool = Tool.define({
       await SubSession.create(
         ctx.sessionID,
         subSession.id,
-        `Agent ${params.description}`,
+        params.description,
         params.prompt,
       )
       Debug.log("[TASK] SubSession.create completed successfully")
-      
+
       // Verification Agent - verify sub-session creation in real-time
       const verificationAgent = async () => {
-        await new Promise(resolve => setTimeout(resolve, 100)) // Brief delay for storage
+        await new Promise((resolve) => setTimeout(resolve, 100)) // Brief delay for storage
         const { SessionDiagnostics } = await import("../session/diagnostics")
-        const verification = await SessionDiagnostics.verifySubSessions(ctx.sessionID)
+        const verification = await SessionDiagnostics.verifySubSessions(
+          ctx.sessionID,
+        )
         Debug.log("[VERIFICATION] Sub-session creation result:", {
           parentId: ctx.sessionID,
           subSessionId: subSession.id,
           verified: verification.subSessionCount > 0,
-          totalInStorage: verification.totalInStorage
+          totalInStorage: verification.totalInStorage,
         })
-        
+
         // Emit custom event for debugging
-        Bus.publish(Bus.event("subsession.created", z.object({
-          parentId: z.string(),
-          subSessionId: z.string(),
-          verified: z.boolean(),
-          count: z.number()
-        })), {
-          parentId: ctx.sessionID,
-          subSessionId: subSession.id,
-          verified: verification.subSessionCount > 0,
-          count: verification.subSessionCount
-        })
+        Bus.publish(
+          Bus.event(
+            "subsession.created",
+            z.object({
+              parentId: z.string(),
+              subSessionId: z.string(),
+              verified: z.boolean(),
+              count: z.number(),
+            }),
+          ),
+          {
+            parentId: ctx.sessionID,
+            subSessionId: subSession.id,
+            verified: verification.subSessionCount > 0,
+            count: verification.subSessionCount,
+          },
+        )
       }
-      verificationAgent().catch(e => Debug.error("[VERIFICATION] Error:", e)) // Fire and forget
+      verificationAgent().catch((e) => Debug.error("[VERIFICATION] Error:", e)) // Fire and forget
     } catch (error) {
       Debug.error("[TASK] SubSession.create failed:", error)
       throw error
     }
 
-    // Mark sub-session as running
-    await SubSession.update(subSession.id, { status: "running" })
-
     // Emit task started event
     const taskID = subSession.id
     const startTime = Date.now()
+
+    // Mark sub-session as running with start time
+    await SubSession.update(subSession.id, {
+      status: "running",
+      startedAt: startTime,
+    })
     emitTaskStarted({
       sessionID: ctx.sessionID,
       taskID,
-      agentName: `Agent ${params.description}`,
+      agentName: params.description,
       taskDescription: params.prompt,
       timestamp: startTime,
     })
@@ -151,6 +162,7 @@ export const TaskTool = Tool.define({
         progress: 50, // Simplified progress tracking
         message: "Processing...",
         timestamp: Date.now(),
+        startTime: startTime,
       })
     })
 

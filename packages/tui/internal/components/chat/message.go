@@ -4,23 +4,31 @@ import (
 	"encoding/json"
 	"fmt"
 	"path/filepath"
+	"regexp"
 	"slices"
 	"strings"
+	"sync"
 	"time"
 	"unicode"
 
 	"github.com/charmbracelet/lipgloss/v2"
 	"github.com/charmbracelet/lipgloss/v2/compat"
 	"github.com/charmbracelet/x/ansi"
-	"github.com/sst/opencode-sdk-go"
 	"github.com/sst/dgmo/internal/app"
 	"github.com/sst/dgmo/internal/components/diff"
 	"github.com/sst/dgmo/internal/layout"
 	"github.com/sst/dgmo/internal/styles"
 	"github.com/sst/dgmo/internal/theme"
+	"github.com/sst/opencode-sdk-go"
 	"github.com/tidwall/gjson"
 	"golang.org/x/text/cases"
 	"golang.org/x/text/language"
+)
+
+// Global map to track task start times
+var (
+	taskStartTimes = make(map[string]time.Time)
+	taskMutex      sync.RWMutex
 )
 
 func toMarkdown(content string, width int, backgroundColor compat.AdaptiveColor) string {
@@ -466,6 +474,47 @@ func renderToolName(name string) string {
 	}
 }
 
+// extractAgentNumber extracts the agent number from task descriptions
+func extractAgentNumber(description string) string {
+	// Look for patterns like "Agent 1", "agent 2", etc.
+	re := regexp.MustCompile(`(?i)agent\s*(\d+)`)
+	matches := re.FindStringSubmatch(description)
+	if len(matches) > 1 {
+		return matches[1]
+	}
+	// If no agent number found, generate one based on current tasks
+	return "1"
+}
+
+// getTaskIcon returns an appropriate icon based on the task description
+func getTaskIcon(description string) string {
+	desc := strings.ToLower(description)
+	switch {
+	case strings.Contains(desc, "search") || strings.Contains(desc, "find"):
+		return "🔍"
+	case strings.Contains(desc, "write") || strings.Contains(desc, "create"):
+		return "📝"
+	case strings.Contains(desc, "edit") || strings.Contains(desc, "modify"):
+		return "✏️"
+	case strings.Contains(desc, "build") || strings.Contains(desc, "compile"):
+		return "🚀"
+	case strings.Contains(desc, "test") || strings.Contains(desc, "verify"):
+		return "🧪"
+	case strings.Contains(desc, "debug") || strings.Contains(desc, "fix"):
+		return "🐛"
+	case strings.Contains(desc, "analyze") || strings.Contains(desc, "review"):
+		return "📊"
+	case strings.Contains(desc, "design") || strings.Contains(desc, "style"):
+		return "🎨"
+	case strings.Contains(desc, "deploy") || strings.Contains(desc, "release"):
+		return "🚢"
+	case strings.Contains(desc, "document") || strings.Contains(desc, "docs"):
+		return "📚"
+	default:
+		return "⚡"
+	}
+}
+
 func renderToolTitle(
 	toolCall opencode.ToolInvocationPart,
 	messageMetadata opencode.MessageMetadata,
@@ -507,9 +556,43 @@ func renderToolTitle(
 		if filename, ok := toolArgsMap["filePath"].(string); ok {
 			title = fmt.Sprintf("%s %s", title, relative(filename))
 		}
-	case "bash", "task":
+	case "bash":
 		if description, ok := toolArgsMap["description"].(string); ok {
 			title = fmt.Sprintf("%s %s", title, description)
+		}
+	case "task":
+		if description, ok := toolArgsMap["description"].(string); ok {
+			// Use the beautiful task renderer
+			icon := getTaskIcon(description)
+
+			// Determine status based on tool invocation state
+			status := "running"
+			if toolCall.ToolInvocation.State == "result" {
+				// Check if there's an error in metadata
+				// For now, assume completed if we have a result
+				status = "completed"
+			}
+
+			// Track task start time
+			taskKey := toolCall.ToolInvocation.ToolCallID
+			taskMutex.Lock()
+			if _, exists := taskStartTimes[taskKey]; !exists && status == "running" {
+				taskStartTimes[taskKey] = time.Now()
+			}
+			startTime, exists := taskStartTimes[taskKey]
+			taskMutex.Unlock()
+
+			// Calculate duration
+			var duration time.Duration
+			if exists {
+				duration = time.Since(startTime)
+			}
+
+			// For now, we don't have real progress, so use 0
+			progress := 0
+
+			// Use the beautiful task renderer - pass description as the agent identifier
+			return RenderTaskBox(icon, description, "", status, progress, duration, width)
 		}
 	case "webfetch":
 		toolArgs = renderArgs(&toolArgsMap, "url")
@@ -524,31 +607,55 @@ func renderToolTitle(
 }
 
 func renderToolAction(name string) string {
+	spinner := GetSpinnerFrame()
+	t := theme.CurrentTheme()
+	spinnerStyle := lipgloss.NewStyle().Foreground(t.Primary()).Bold(true)
+	textStyle := lipgloss.NewStyle().Foreground(t.Text()).Italic(true)
+
+	var icon, action string
 	switch name {
 	case "task":
-		return "Searching..."
+		icon = "🚀"
+		action = "Creating agent"
 	case "bash":
-		return "Writing command..."
+		icon = "⚡"
+		action = "Writing command"
 	case "edit":
-		return "Preparing edit..."
+		icon = "✏️"
+		action = "Preparing edit"
 	case "webfetch":
-		return "Fetching from the web..."
+		icon = "🌐"
+		action = "Fetching from web"
 	case "glob":
-		return "Finding files..."
+		icon = "🔎"
+		action = "Finding files"
 	case "grep":
-		return "Searching content..."
+		icon = "🔍"
+		action = "Searching content"
 	case "list":
-		return "Listing directory..."
+		icon = "📁"
+		action = "Listing directory"
 	case "read":
-		return "Reading file..."
+		icon = "📖"
+		action = "Reading file"
 	case "write":
-		return "Preparing write..."
-	case "todowrite", "todoread":
-		return "Planning..."
+		icon = "💾"
+		action = "Preparing write"
+	case "todowrite":
+		icon = "📋"
+		action = "Writing tasks"
+	case "todoread":
+		icon = "📋"
+		action = "Reading tasks"
 	case "patch":
-		return "Preparing patch..."
+		icon = "🔧"
+		action = "Preparing patch"
+	default:
+		icon = "⚙️"
+		action = "Working"
 	}
-	return "Working..."
+
+	return fmt.Sprintf("%s %s %s", icon, spinnerStyle.Render(spinner), textStyle.Render(action+"..."))
 }
 
 type fileRenderer struct {

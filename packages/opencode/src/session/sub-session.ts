@@ -1,4 +1,3 @@
-import { Debug } from "../util/debug"
 import { z } from "zod"
 import { Storage } from "../storage/storage"
 import { Identifier } from "../id/id"
@@ -13,6 +12,7 @@ export namespace SubSession {
     taskDescription: z.string(),
     status: z.enum(["pending", "running", "completed", "failed"]),
     createdAt: z.number(),
+    startedAt: z.number().optional(),
     completedAt: z.number().optional(),
     summary: z.string().optional(),
   })

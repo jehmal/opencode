@@ -21,6 +21,7 @@ export const TaskProgressEvent = Bus.event(
     progress: z.number().min(0).max(100),
     message: z.string().optional(),
     timestamp: z.number(),
+    startTime: z.number().optional(),
   }),
 )
 

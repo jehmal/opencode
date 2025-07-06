@@ -26,6 +26,7 @@ require golang.org/x/exp v0.0.0-20250305212735-054e65f0b394 // indirect
 require (
 	dario.cat/mergo v1.0.2 // indirect
 	github.com/atombender/go-jsonschema v0.20.0 // indirect
+	github.com/charmbracelet/harmonica v0.2.0 // indirect
 	github.com/charmbracelet/lipgloss v1.1.1-0.20250404203927-76690c660834 // indirect
 	github.com/charmbracelet/x/exp/slice v0.0.0-20250327172914-2fdc97757edf // indirect
 	github.com/charmbracelet/x/input v0.3.5-0.20250424101541-abb4d9a9b197 // indirect
@@ -44,7 +45,6 @@ require (
 	github.com/oapi-codegen/oapi-codegen/v2 v2.4.1 // indirect
 	github.com/perimeterx/marshmallow v1.1.5 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
-	github.com/sahilm/fuzzy v0.1.1 // indirect
 	github.com/sanity-io/litter v1.5.8 // indirect
 	github.com/sosodev/duration v1.3.1 // indirect
 	github.com/speakeasy-api/openapi-overlay v0.9.0 // indirect

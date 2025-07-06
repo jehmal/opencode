@@ -44,7 +44,6 @@ export const TuiCommand = cmd({
             server.stop()
           }
         }
-
         const goPath =
           Bun.which("go", { PATH: process.env["PATH"] }) || "/usr/bin/go"
         let cmd = [goPath, "run", "./main.go"]
