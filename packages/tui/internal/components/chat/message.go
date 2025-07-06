@@ -30,6 +30,8 @@ var (
 	taskStartTimes  = make(map[string]time.Time)
 	taskProgress    = make(map[string]int)
 	taskCurrentTool = make(map[string]string)
+	taskPhase       = make(map[string]string)
+	taskMessage     = make(map[string]string)
 	taskMutex       sync.RWMutex
 )
 
@@ -63,6 +65,40 @@ func GetTaskTool(taskID string) string {
 	defer taskMutex.RUnlock()
 	if tool, ok := taskCurrentTool[taskID]; ok {
 		return tool
+	}
+	return ""
+}
+
+// UpdateTaskPhase updates the phase for a task
+func UpdateTaskPhase(taskID string, phase string) {
+	taskMutex.Lock()
+	defer taskMutex.Unlock()
+	taskPhase[taskID] = phase
+}
+
+// GetTaskPhase gets the phase for a task
+func GetTaskPhase(taskID string) string {
+	taskMutex.RLock()
+	defer taskMutex.RUnlock()
+	if phase, ok := taskPhase[taskID]; ok {
+		return phase
+	}
+	return ""
+}
+
+// UpdateTaskMessage updates the message for a task
+func UpdateTaskMessage(taskID string, message string) {
+	taskMutex.Lock()
+	defer taskMutex.Unlock()
+	taskMessage[taskID] = message
+}
+
+// GetTaskMessage gets the message for a task
+func GetTaskMessage(taskID string) string {
+	taskMutex.RLock()
+	defer taskMutex.RUnlock()
+	if msg, ok := taskMessage[taskID]; ok {
+		return msg
 	}
 	return ""
 }
@@ -470,12 +506,17 @@ func renderToolDetails(
 			body = strings.Join(steps, "\n")
 		}
 	default:
-		if result == nil {
-			empty := ""
-			result = &empty
+		// Check if this is an MCP tool (contains underscore in name)
+		if strings.Contains(toolCall.ToolInvocation.ToolName, "_") {
+			body = renderMCPCompact(toolCall, metadata, result, width)
+		} else {
+			if result == nil {
+				empty := ""
+				result = &empty
+			}
+			body = *result
+			body = truncateHeight(body, 10)
 		}
-		body = *result
-		body = truncateHeight(body, 10)
 	}
 
 	error := ""
@@ -631,7 +672,15 @@ func renderToolTitle(
 				duration = time.Since(startTime)
 			}
 
-			// Get real progress from global map
+			// Get task metadata from global maps
+			message := GetTaskMessage(taskKey)
+
+			// If we have a custom message, use the message-based renderer
+			if message != "" {
+				return RenderTaskBoxWithMessage(icon, description, "", status, message, duration, width)
+			}
+
+			// Otherwise fall back to the old behavior
 			progress := GetTaskProgress(taskKey)
 
 			// Debug: If progress is 0 for running tasks, start with 25%
@@ -877,4 +926,183 @@ func renderDiagnostics(metadata opencode.MessageMetadataTool, filePath string) s
 	// 	return ""
 	// }
 
+}
+
+// renderMCPCompact creates a compact display for MCP tool calls
+func renderMCPCompact(toolCall opencode.ToolInvocationPart, metadata opencode.MessageMetadataTool, result *string, width int) string {
+	t := theme.CurrentTheme()
+
+	// Parse MCP tool name (e.g., "qdrant_qdrant-find" -> "qdrant" server, "find" function)
+	toolName := toolCall.ToolInvocation.ToolName
+	parts := strings.SplitN(toolName, "_", 2)
+	serverName := parts[0]
+	functionName := toolName
+	if len(parts) > 1 {
+		functionName = parts[1]
+	}
+
+	// Get key parameters for display
+	toolArgs := toolCall.ToolInvocation.Args
+	var keyParams []string
+
+	// Extract important parameters based on common MCP patterns
+	if toolArgsMap, ok := toolArgs.(map[string]interface{}); ok {
+		if query, ok := toolArgsMap["query"].(string); ok && query != "" {
+			truncated := query
+			if len(truncated) > 50 {
+				truncated = truncated[:47] + "..."
+			}
+			keyParams = append(keyParams, fmt.Sprintf("query: '%s'", truncated))
+		}
+		if collection, ok := toolArgsMap["collection_name"].(string); ok && collection != "" {
+			keyParams = append(keyParams, fmt.Sprintf("collection: %s", collection))
+		}
+		if task, ok := toolArgsMap["task"].(string); ok && task != "" {
+			truncated := task
+			if len(truncated) > 40 {
+				truncated = truncated[:37] + "..."
+			}
+			keyParams = append(keyParams, fmt.Sprintf("task: '%s'", truncated))
+		}
+		if techniques, ok := toolArgsMap["techniques"].([]interface{}); ok && len(techniques) > 0 {
+			keyParams = append(keyParams, fmt.Sprintf("techniques: %d", len(techniques)))
+		}
+		if limit, ok := toolArgsMap["limit"].(float64); ok {
+			keyParams = append(keyParams, fmt.Sprintf("limit: %.0f", limit))
+		}
+	}
+
+	// Determine status and result summary
+	var status, resultSummary string
+
+	// Safe type assertion for finished field
+	finished := false
+	if finishedVal, ok := metadata.ExtraFields["finished"]; ok && finishedVal != nil {
+		if finishedBool, ok := finishedVal.(bool); ok {
+			finished = finishedBool
+		}
+	}
+
+	if err, ok := metadata.ExtraFields["error"].(bool); ok && err {
+		status = "❌ Failed"
+		if message, ok := metadata.ExtraFields["message"].(string); ok {
+			resultSummary = message
+		}
+	} else if finished {
+		status = "✅ Success"
+		if result != nil && *result != "" {
+			// Try to extract meaningful summary from result
+			resultText := *result
+			if strings.Contains(resultText, "\"status\": \"success\"") {
+				// Parse JSON response for summary
+				if strings.Contains(resultText, "\"results\":") {
+					if count := strings.Count(resultText, "\"content\":"); count > 0 {
+						resultSummary = fmt.Sprintf("%d results found", count)
+					}
+				} else if strings.Contains(resultText, "\"collections\":") {
+					if count := strings.Count(resultText, "\"name\":"); count > 0 {
+						resultSummary = fmt.Sprintf("%d collections", count)
+					}
+				} else if strings.Contains(resultText, "\"points_count\":") {
+					resultSummary = "Collection info retrieved"
+				} else {
+					resultSummary = "Operation completed"
+				}
+			} else {
+				// For non-JSON results, show first line or truncated content
+				lines := strings.Split(resultText, "\n")
+				if len(lines) > 0 && lines[0] != "" {
+					resultSummary = lines[0]
+					if len(resultSummary) > 60 {
+						resultSummary = resultSummary[:57] + "..."
+					}
+				}
+			}
+		}
+		if resultSummary == "" {
+			resultSummary = "Completed successfully"
+		}
+	} else {
+		status = "⏳ Running"
+		resultSummary = "Processing request..."
+	}
+
+	// Build compact display
+	var lines []string
+
+	// Brief result summary (1-3 lines) at the top
+	if finished && result != nil && *result != "" {
+		summaryStyle := lipgloss.NewStyle().Foreground(t.Text()).Italic(true)
+		resultText := *result
+
+		// Generate brief summary based on result content
+		var briefSummary string
+		if strings.Contains(resultText, "\"status\": \"success\"") {
+			// Parse JSON for key information
+			if strings.Contains(resultText, "\"results\":") && strings.Contains(resultText, "\"content\":") {
+				count := strings.Count(resultText, "\"content\":")
+				briefSummary = fmt.Sprintf("Found %d results", count)
+			} else if strings.Contains(resultText, "\"collections\":") {
+				count := strings.Count(resultText, "\"name\":")
+				briefSummary = fmt.Sprintf("Listed %d collections", count)
+			} else if strings.Contains(resultText, "\"points_count\":") {
+				briefSummary = "Retrieved collection information"
+			} else {
+				briefSummary = "Operation completed successfully"
+			}
+		} else {
+			// For non-JSON results, show first line truncated
+			lines := strings.Split(resultText, "\n")
+			if len(lines) > 0 && lines[0] != "" {
+				briefSummary = lines[0]
+				if len(briefSummary) > 80 {
+					briefSummary = briefSummary[:77] + "..."
+				}
+			} else {
+				briefSummary = "Operation completed"
+			}
+		}
+
+		if briefSummary != "" {
+			lines = append(lines, summaryStyle.Render(briefSummary))
+			lines = append(lines, "") // Empty line for spacing
+		}
+	}
+
+	// Header line: MCP Server • Function
+	headerStyle := lipgloss.NewStyle().Foreground(t.Primary()).Bold(true)
+	serverStyle := lipgloss.NewStyle().Foreground(t.Secondary())
+	header := fmt.Sprintf("%s %s • %s",
+		headerStyle.Render("MCP"),
+		serverStyle.Render(serverName),
+		functionName)
+	lines = append(lines, header)
+	// Parameters line (if any)
+	if len(keyParams) > 0 {
+		paramStyle := lipgloss.NewStyle().Foreground(t.TextMuted())
+		paramLine := strings.Join(keyParams, ", ")
+		if len(paramLine) > width-4 {
+			paramLine = paramLine[:width-7] + "..."
+		}
+		lines = append(lines, paramStyle.Render("  "+paramLine))
+	}
+
+	// Status and result line
+	var statusStyle lipgloss.Style
+	if strings.Contains(status, "✅") {
+		statusStyle = lipgloss.NewStyle().Foreground(t.Success())
+	} else if strings.Contains(status, "❌") {
+		statusStyle = lipgloss.NewStyle().Foreground(t.Error())
+	} else {
+		statusStyle = lipgloss.NewStyle().Foreground(t.Warning())
+	}
+
+	statusLine := fmt.Sprintf("  %s", statusStyle.Render(status))
+	if resultSummary != "" {
+		resultStyle := lipgloss.NewStyle().Foreground(t.Text())
+		statusLine += " " + resultStyle.Render(resultSummary)
+	}
+	lines = append(lines, statusLine)
+
+	return strings.Join(lines, "\n")
 }
