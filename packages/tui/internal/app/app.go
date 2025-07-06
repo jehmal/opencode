@@ -41,6 +41,9 @@ type App struct {
 	SessionStack         []string // Stack of session IDs for navigation history
 	CurrentSessionType   string   // "main" or "sub"
 	LastViewedSubSession string   // Track last viewed sub-session for quick access
+
+	// Task tracking
+	TaskClient *TaskClient
 }
 
 type SessionSelectedMsg = *opencode.Session

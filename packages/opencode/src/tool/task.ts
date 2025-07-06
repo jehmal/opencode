@@ -155,12 +155,40 @@ export const TaskTool = Tool.define({
         summary: summary(evt.properties.info),
       })
 
-      // Emit progress event (estimate based on message updates)
+      // Emit progress event with better estimation
+      // Count tool invocations to estimate progress
+      const message = evt.properties.info
+      let toolCount = 0
+      let completedTools = 0
+
+      if (message.parts) {
+        message.parts.forEach((part) => {
+          if (part.type === "tool-invocation") {
+            toolCount++
+            if (
+              "toolInvocation" in part &&
+              part.toolInvocation?.state === "result"
+            ) {
+              completedTools++
+            }
+          }
+        })
+      }
+
+      // Calculate progress based on tool completion
+      let progress = 25 // Base progress for starting
+      if (toolCount > 0) {
+        progress = Math.min(
+          25 + Math.floor((completedTools / toolCount) * 65),
+          90,
+        )
+      }
+
       emitTaskProgress({
         sessionID: ctx.sessionID,
         taskID,
-        progress: 50, // Simplified progress tracking
-        message: "Processing...",
+        progress,
+        message: `Processing (${completedTools}/${toolCount} tools completed)...`,
         timestamp: Date.now(),
         startTime: startTime,
       })

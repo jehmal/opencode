@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	tea "github.com/charmbracelet/bubbletea/v2"
 	"github.com/sst/dgmo/internal/app"
@@ -81,6 +82,44 @@ func main() {
 		tea.WithKeyboardEnhancements(),
 		tea.WithMouseCellMotion(),
 	)
+
+	// Initialize task client with event handlers
+	taskClient := app.NewTaskClient(app.TaskEventHandlers{
+		OnTaskStarted: func(task app.TaskInfo) {
+			program.Send(app.TaskStartedMsg{Task: task})
+		},
+		OnTaskProgress: func(taskID string, progress int, message string) {
+			program.Send(app.TaskProgressMsg{
+				TaskID:   taskID,
+				Progress: progress,
+				Message:  message,
+			})
+		},
+		OnTaskCompleted: func(taskID string, duration time.Duration, success bool, summary string) {
+			program.Send(app.TaskCompletedMsg{
+				TaskID:   taskID,
+				Duration: duration,
+				Success:  success,
+				Summary:  summary,
+			})
+		},
+		OnTaskFailed: func(taskID string, error string, recoverable bool) {
+			program.Send(app.TaskFailedMsg{
+				TaskID:      taskID,
+				Error:       error,
+				Recoverable: recoverable,
+			})
+		},
+	})
+
+	// Connect to task event server
+	if err := taskClient.Connect(); err != nil {
+		slog.Warn("Failed to connect to task event server", "error", err)
+		// Don't fail, just continue without task progress
+	} else {
+		app_.TaskClient = taskClient
+		defer taskClient.Disconnect()
+	}
 
 	go func() {
 		stream := httpClient.Event.ListStreaming(ctx)

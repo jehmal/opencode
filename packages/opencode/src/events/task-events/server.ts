@@ -56,6 +56,9 @@ export class TaskEventServer {
     })
 
     Bus.subscribe(TaskProgressEvent, (event) => {
+      log.info(
+        `Broadcasting task progress: ${event.properties.taskID} - ${event.properties.progress}%`,
+      )
       this.broadcast({
         type: "task.progress",
         data: event.properties,

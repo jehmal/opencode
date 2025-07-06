@@ -9,6 +9,7 @@ import fs from "fs/promises"
 import { Installation } from "../../installation"
 import { Config } from "../../config/config"
 import { Bus } from "../../bus"
+import { TaskEventServer } from "../../events/task-events/server"
 
 export const TuiCommand = cmd({
   command: "$0 [project]",
@@ -37,11 +38,17 @@ export const TuiCommand = cmd({
           port: 0,
           hostname: "127.0.0.1",
         })
+
+        // Start the WebSocket task event server
+        const taskEventServer = new TaskEventServer()
+        taskEventServer.start()
+
         let serverStopped = false
         const stopServer = () => {
           if (!serverStopped && server) {
             serverStopped = true
             server.stop()
+            taskEventServer.stop()
           }
         }
         const goPath =

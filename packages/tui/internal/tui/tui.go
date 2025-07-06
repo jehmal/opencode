@@ -458,6 +458,19 @@ func (a appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// Reset interrupt key state after timeout
 		a.interruptKeyState = InterruptKeyIdle
 		a.editor.SetInterruptKeyInDebounce(false)
+	case app.TaskStartedMsg:
+		// Task started - update progress to 0
+		chat.UpdateTaskProgress(msg.Task.ID, 0)
+	case app.TaskProgressMsg:
+		// Update task progress
+		chat.UpdateTaskProgress(msg.TaskID, msg.Progress)
+	case app.TaskCompletedMsg:
+		// Task completed - set progress to 100
+		chat.UpdateTaskProgress(msg.TaskID, 100)
+	case app.TaskFailedMsg:
+		// Task failed - could show error state
+		// For now, just log it
+		slog.Warn("Task failed", "taskID", msg.TaskID, "error", msg.Error)
 	}
 
 	// update status bar

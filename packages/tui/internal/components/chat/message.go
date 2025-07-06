@@ -25,11 +25,47 @@ import (
 	"golang.org/x/text/language"
 )
 
-// Global map to track task start times
+// Global map to track task start times and progress
 var (
-	taskStartTimes = make(map[string]time.Time)
-	taskMutex      sync.RWMutex
+	taskStartTimes  = make(map[string]time.Time)
+	taskProgress    = make(map[string]int)
+	taskCurrentTool = make(map[string]string)
+	taskMutex       sync.RWMutex
 )
+
+// UpdateTaskProgress updates the progress for a task
+func UpdateTaskProgress(taskID string, progress int) {
+	taskMutex.Lock()
+	defer taskMutex.Unlock()
+	taskProgress[taskID] = progress
+}
+
+// GetTaskProgress gets the progress for a task
+func GetTaskProgress(taskID string) int {
+	taskMutex.RLock()
+	defer taskMutex.RUnlock()
+	if progress, ok := taskProgress[taskID]; ok {
+		return progress
+	}
+	return 0
+}
+
+// UpdateTaskTool updates the current tool for a task
+func UpdateTaskTool(taskID string, tool string) {
+	taskMutex.Lock()
+	defer taskMutex.Unlock()
+	taskCurrentTool[taskID] = tool
+}
+
+// GetTaskTool gets the current tool for a task
+func GetTaskTool(taskID string) string {
+	taskMutex.RLock()
+	defer taskMutex.RUnlock()
+	if tool, ok := taskCurrentTool[taskID]; ok {
+		return tool
+	}
+	return ""
+}
 
 func toMarkdown(content string, width int, backgroundColor compat.AdaptiveColor) string {
 	r := styles.GetMarkdownRenderer(width-7, backgroundColor)
@@ -230,18 +266,25 @@ func renderText(
 	if !showToolDetails && toolCalls != nil && len(toolCalls) > 0 {
 		content = content + "\n\n"
 		for _, toolCall := range toolCalls {
-			title := renderToolTitle(toolCall, message.Metadata, width)
-			metadata := opencode.MessageMetadataTool{}
-			if _, ok := message.Metadata.Tool[toolCall.ToolInvocation.ToolCallID]; ok {
-				metadata = message.Metadata.Tool[toolCall.ToolInvocation.ToolCallID]
+			// Special handling for task tool to preserve multi-line format
+			if toolCall.ToolInvocation.ToolName == "task" {
+				taskContent := renderToolTitle(toolCall, message.Metadata, width)
+				// For tasks, don't add the "∟ " prefix as it breaks the box formatting
+				content = content + taskContent + "\n"
+			} else {
+				title := renderToolTitle(toolCall, message.Metadata, width)
+				metadata := opencode.MessageMetadataTool{}
+				if _, ok := message.Metadata.Tool[toolCall.ToolInvocation.ToolCallID]; ok {
+					metadata = message.Metadata.Tool[toolCall.ToolInvocation.ToolCallID]
+				}
+				style := styles.NewStyle()
+				if _, ok := metadata.ExtraFields["error"]; ok {
+					style = style.Foreground(t.Error())
+				}
+				title = style.Render(title)
+				title = "∟ " + title + "\n"
+				content = content + title
 			}
-			style := styles.NewStyle()
-			if _, ok := metadata.ExtraFields["error"]; ok {
-				style = style.Foreground(t.Error())
-			}
-			title = style.Render(title)
-			title = "∟ " + title + "\n"
-			content = content + title
 		}
 	}
 
@@ -588,11 +631,19 @@ func renderToolTitle(
 				duration = time.Since(startTime)
 			}
 
-			// For now, we don't have real progress, so use 0
-			progress := 0
+			// Get real progress from global map
+			progress := GetTaskProgress(taskKey)
 
-			// Use the beautiful task renderer - pass description as the agent identifier
-			return RenderTaskBox(icon, description, "", status, progress, duration, width)
+			// Debug: If progress is 0 for running tasks, start with 25%
+			if status == "running" && progress == 0 {
+				progress = 25
+			}
+
+			// Get current tool for dynamic status
+			currentTool := GetTaskTool(taskKey)
+
+			// Use the beautiful task renderer with tool info
+			return RenderTaskBoxWithTool(icon, description, "", status, progress, duration, width, currentTool)
 		}
 	case "webfetch":
 		toolArgs = renderArgs(&toolArgsMap, "url")
