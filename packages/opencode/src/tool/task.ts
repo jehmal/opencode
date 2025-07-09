@@ -76,8 +76,12 @@ export const TaskTool = Tool.define({
     const msg = await Session.getMessage(ctx.sessionID, ctx.messageID)
     const metadata = msg.metadata.assistant!
 
+    // Clean the modelID by removing any TECHNIQUES suffix
+    const cleanModelID = metadata.modelID.split('|')[0]
+    
     Debug.log("[TASK] Using model configuration from parent message:", {
-      modelID: metadata.modelID,
+      originalModelID: metadata.modelID,
+      cleanModelID: cleanModelID,
       providerID: metadata.providerID,
     })
 
@@ -302,7 +306,7 @@ export const TaskTool = Tool.define({
     try {
       Debug.log("[TASK] Starting Session.chat execution", {
         subSessionId: subSession.id,
-        modelID: metadata.modelID,
+        modelID: cleanModelID,
         providerID: metadata.providerID,
         promptLength: params.prompt.length,
       })
@@ -360,7 +364,7 @@ export const TaskTool = Tool.define({
 
       const result = await Session.chat({
         sessionID: subSession.id,
-        modelID: metadata.modelID,
+        modelID: cleanModelID,
         providerID: metadata.providerID,
         parts: [
           {
@@ -438,7 +442,7 @@ export const TaskTool = Tool.define({
         subSessionId: subSession.id,
         error: errorMessage,
         stack: errorStack,
-        modelID: metadata.modelID,
+        modelID: cleanModelID,
         providerID: metadata.providerID,
       })
 
@@ -496,7 +500,7 @@ export const TaskTool = Tool.define({
             // Execute debug task
             const debugResult = await Session.chat({
               sessionID: debugSession.id,
-              modelID: metadata.modelID,
+              modelID: cleanModelID,
               providerID: metadata.providerID,
               parts: [
                 {
