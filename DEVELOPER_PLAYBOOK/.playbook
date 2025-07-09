@@ -1,0 +1,26 @@
+{
+  "version": "1.0.0",
+  "created": "2025-07-09",
+  "purpose": "Battle-tested solutions from real debugging sessions",
+  "time_saved": "~4 hours per similar implementation",
+  "entries": [
+    {
+      "file": "CHECKPOINT_DEBUGGING_TUTORIAL.md",
+      "problem_solved": "Checkpoints not showing despite server working",
+      "key_insight": "Bubble Tea Init() must be called explicitly",
+      "applicable_to": ["async dialogs", "data loading", "client-server features"]
+    },
+    {
+      "file": "BUBBLE_TEA_DIALOG_PATTERN.md", 
+      "problem_solved": "Dialog shows Loading... forever",
+      "key_insight": "Command-based architecture requires explicit execution",
+      "applicable_to": ["any Bubble Tea dialog", "async UI components"]
+    }
+  ],
+  "quick_wins": [
+    "Check Init() first when dialogs don't load",
+    "Use file logging in TUI apps",
+    "Test server endpoints independently",
+    "Pass baseURL, never hardcode ports"
+  ]
+}
