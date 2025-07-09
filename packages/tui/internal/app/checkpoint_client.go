@@ -10,13 +10,12 @@ import (
 
 // CheckpointService provides checkpoint-related operations
 type CheckpointService struct {
-	serverPort int
+	baseURL string
 }
 
 // NewCheckpointService creates a new checkpoint service
-func NewCheckpointService() *CheckpointService {
-	// Default to standard port
-	return &CheckpointService{serverPort: 5747}
+func NewCheckpointService(baseURL string) *CheckpointService {
+	return &CheckpointService{baseURL: baseURL}
 }
 
 // Checkpoint represents a checkpoint with all its metadata
@@ -41,7 +40,7 @@ type CheckpointMetadata struct {
 
 // ListCheckpoints retrieves all checkpoints for a session
 func (s *CheckpointService) ListCheckpoints(ctx context.Context, sessionID string) ([]Checkpoint, error) {
-	url := fmt.Sprintf("http://localhost:%d/session/%s/checkpoints", s.serverPort, sessionID)
+	url := fmt.Sprintf("%s/session/%s/checkpoints", s.baseURL, sessionID)
 
 	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 	if err != nil {
@@ -77,7 +76,7 @@ func (s *CheckpointService) ListCheckpoints(ctx context.Context, sessionID strin
 
 // RestoreCheckpoint restores the session to a specific checkpoint
 func (s *CheckpointService) RestoreCheckpoint(ctx context.Context, checkpointID string) error {
-	url := fmt.Sprintf("http://localhost:%d/checkpoint/%s/restore", s.serverPort, checkpointID)
+	url := fmt.Sprintf("%s/checkpoint/%s/restore", s.baseURL, checkpointID)
 
 	req, err := http.NewRequestWithContext(ctx, "POST", url, nil)
 	if err != nil {

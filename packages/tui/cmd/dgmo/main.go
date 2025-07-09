@@ -72,7 +72,7 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	app_, err := app.New(ctx, version, appInfo, httpClient)
+	app_, err := app.New(ctx, version, appInfo, httpClient, url)
 	if err != nil {
 		panic(err)
 	}
@@ -90,10 +90,10 @@ func main() {
 			program.Send(app.TaskStartedMsg{Task: task})
 		},
 		OnTaskProgress: func(sessionID, taskID string, progress int, message string, phase string, currentTool string) {
-			slog.Info("TUI received task progress event", 
-				"sessionID", sessionID, 
-				"taskID", taskID, 
-				"progress", progress, 
+			slog.Info("TUI received task progress event",
+				"sessionID", sessionID,
+				"taskID", taskID,
+				"progress", progress,
 				"message", message,
 				"phase", phase,
 				"currentTool", currentTool)

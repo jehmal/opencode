@@ -91,6 +91,7 @@ func New(
 	version string,
 	appInfo opencode.App,
 	httpClient *opencode.Client,
+	baseURL string,
 ) (*App, error) {
 	RootPath = appInfo.Path.Root
 	CwdPath = appInfo.Path.Cwd
@@ -149,7 +150,7 @@ func New(
 		Client:            httpClient,
 		State:             appState,
 		Commands:          commands.LoadFromConfig(configInfo),
-		CheckpointService: NewCheckpointService(),
+		CheckpointService: NewCheckpointService(baseURL),
 	}
 
 	// Initialize navigation state
