@@ -3,282 +3,352 @@ package dialog
 import (
 	"context"
 	"fmt"
-	"strings"
+	"log/slog"
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea/v2"
-	"github.com/charmbracelet/lipgloss/v2"
+	"github.com/muesli/reflow/truncate"
 	"github.com/sst/dgmo/internal/app"
+	"github.com/sst/dgmo/internal/components/list"
+	"github.com/sst/dgmo/internal/components/modal"
 	"github.com/sst/dgmo/internal/components/toast"
 	"github.com/sst/dgmo/internal/layout"
+	"github.com/sst/dgmo/internal/styles"
+	"github.com/sst/dgmo/internal/theme"
+	"github.com/sst/dgmo/internal/util"
 )
-
-// Messages for checkpoint operations
-type checkpointsLoadedMsg struct {
-	checkpoints []app.Checkpoint
-}
-
-type checkpointErrorMsg struct {
-	err error
-}
-
-type checkpointRestoredMsg struct{}
 
 // RevertDialog interface for the checkpoint revert dialog
 type RevertDialog interface {
 	layout.Modal
 }
 
+// checkpointItem is a custom list item for checkpoints
+type checkpointItem struct {
+	checkpoint   app.Checkpoint
+	isConfirming bool
+}
+
+func (c checkpointItem) Render(selected bool, width int) string {
+	t := theme.CurrentTheme()
+	baseStyle := styles.NewStyle()
+
+	var text string
+	if c.isConfirming {
+		text = "Press Enter again to confirm revert"
+	} else {
+		// Show user prompt or description
+		text = c.checkpoint.Description
+		if c.checkpoint.Metadata.UserPrompt != "" {
+			text = c.checkpoint.Metadata.UserPrompt
+		}
+	}
+
+	truncatedStr := truncate.StringWithTail(text, uint(width-1), "...")
+
+	var itemStyle styles.Style
+	if selected {
+		if c.isConfirming {
+			// Red background for revert confirmation
+			itemStyle = baseStyle.
+				Background(t.Error()).
+				Foreground(t.BackgroundElement()).
+				Width(width).
+				PaddingLeft(1)
+		} else {
+			// Normal selection
+			itemStyle = baseStyle.
+				Background(t.Primary()).
+				Foreground(t.BackgroundElement()).
+				Width(width).
+				PaddingLeft(1)
+		}
+	} else {
+		if c.isConfirming {
+			// Red text for revert confirmation when not selected
+			itemStyle = baseStyle.
+				Foreground(t.Error()).
+				PaddingLeft(1)
+		} else {
+			itemStyle = baseStyle.
+				PaddingLeft(1)
+		}
+	}
+
+	// Add time and file count info on second line
+	mainText := itemStyle.Render(truncatedStr)
+
+	if !c.isConfirming {
+		// Format time ago
+		timestamp := time.Unix(c.checkpoint.Timestamp/1000, 0)
+		timeAgo := time.Since(timestamp).Round(time.Minute)
+
+		var timeStr string
+		if timeAgo < time.Hour {
+			timeStr = fmt.Sprintf("%d minutes ago", int(timeAgo.Minutes()))
+		} else if timeAgo < 24*time.Hour {
+			timeStr = fmt.Sprintf("%d hours ago", int(timeAgo.Hours()))
+		} else {
+			timeStr = fmt.Sprintf("%d days ago", int(timeAgo.Hours()/24))
+		}
+
+		subText := fmt.Sprintf("  %s • %d files changed", timeStr, c.checkpoint.Metadata.FileCount)
+		subStyle := baseStyle.Foreground(t.TextMuted()).PaddingLeft(1)
+
+		return mainText + "\n" + subStyle.Render(subText)
+	}
+
+	return mainText
+}
+
 // revertDialog is the implementation
 type revertDialog struct {
-	app           *app.App
-	checkpoints   []app.Checkpoint
-	selectedIndex int
-	loading       bool
-	restoring     bool
-	error         string
-	width         int
-	height        int
+	width              int
+	height             int
+	modal              *modal.Modal
+	checkpoints        []app.Checkpoint
+	list               list.List[checkpointItem]
+	app                *app.App
+	revertConfirmation int // -1 means no confirmation, >= 0 means confirming revert at this index
+	loading            bool
+	error              error
 }
 
-// NewRevertDialog creates a new revert dialog
-func NewRevertDialog(app *app.App) RevertDialog {
-	return &revertDialog{
-		app:           app,
-		loading:       true,
-		selectedIndex: 0,
-	}
-}
-
-// Init initializes the dialog and loads checkpoints
 func (d *revertDialog) Init() tea.Cmd {
 	return d.loadCheckpoints()
 }
 
-// loadCheckpoints fetches checkpoints from the server
 func (d *revertDialog) loadCheckpoints() tea.Cmd {
 	return func() tea.Msg {
-		if d.app.Session == nil {
-			return checkpointErrorMsg{err: fmt.Errorf("no active session")}
-		}
+		slog.Debug("Loading checkpoints for session", "sessionID", d.app.Session.ID)
 
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
 
 		checkpoints, err := d.app.CheckpointService.ListCheckpoints(ctx, d.app.Session.ID)
 		if err != nil {
-			return checkpointErrorMsg{err: err}
+			slog.Error("Failed to load checkpoints", "error", err)
+			return checkpointLoadErrorMsg{err: err}
 		}
 
-		return checkpointsLoadedMsg{checkpoints: checkpoints}
+		slog.Debug("Loaded checkpoints", "count", len(checkpoints))
+		return checkpointLoadedMsg{checkpoints: checkpoints}
 	}
 }
 
-// restoreCheckpoint restores to the selected checkpoint
-func (d *revertDialog) restoreCheckpoint(checkpointID string) tea.Cmd {
-	return func() tea.Msg {
-		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-		defer cancel()
-
-		err := d.app.CheckpointService.RestoreCheckpoint(ctx, checkpointID)
-		if err != nil {
-			return checkpointErrorMsg{err: err}
-		}
-
-		return checkpointRestoredMsg{}
-	}
+type checkpointLoadedMsg struct {
+	checkpoints []app.Checkpoint
 }
 
-// Update handles tea messages
+type checkpointLoadErrorMsg struct {
+	err error
+}
+
+type checkpointRevertedMsg struct{}
+
 func (d *revertDialog) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		d.width = msg.Width
 		d.height = msg.Height
-		return d, nil
+		d.list.SetMaxWidth(layout.Current.Container.Width - 12)
 
-	case checkpointsLoadedMsg:
+	case checkpointLoadedMsg:
 		d.loading = false
 		d.checkpoints = msg.checkpoints
 
-		if len(d.checkpoints) == 0 {
-			d.error = "No checkpoints available"
+		// Convert checkpoints to list items
+		var items []checkpointItem
+		for _, cp := range d.checkpoints {
+			items = append(items, checkpointItem{
+				checkpoint:   cp,
+				isConfirming: false,
+			})
 		}
+		d.list.SetItems(items)
+
+		if len(d.checkpoints) == 0 {
+			d.list.SetEmptyMessage("No checkpoints available")
+		}
+
 		return d, nil
 
-	case checkpointErrorMsg:
+	case checkpointLoadErrorMsg:
 		d.loading = false
-		d.restoring = false
-		d.error = msg.err.Error()
+		d.error = msg.err
 		return d, nil
 
-	case checkpointRestoredMsg:
-		// Close dialog and show success toast
-		return d, tea.Batch(
-			func() tea.Msg { return CloseModalMsg{} },
-			func() tea.Msg { return toast.NewSuccessToast("Checkpoint restored successfully") },
+	case checkpointRevertedMsg:
+		// Close dialog and show success
+		return d, tea.Sequence(
+			util.CmdHandler(modal.CloseModalMsg{}),
+			util.CmdHandler(toast.NewSuccessToast("Checkpoint restored successfully")),
 		)
 
-	case tea.KeyMsg:
-		if d.loading || d.restoring {
+	case tea.KeyPressMsg:
+		if d.loading {
 			return d, nil
 		}
 
+		if d.error != nil {
+			// Any key closes error state
+			return d, util.CmdHandler(modal.CloseModalMsg{})
+		}
+
 		switch msg.String() {
-		case "esc", "ctrl+c", "q":
-			return d, func() tea.Msg { return CloseModalMsg{} }
-
-		case "up", "k":
-			if d.selectedIndex > 0 && len(d.checkpoints) > 0 {
-				d.selectedIndex--
-			}
-
-		case "down", "j":
-			if d.selectedIndex < len(d.checkpoints)-1 {
-				d.selectedIndex++
-			}
-
 		case "enter":
-			if d.error != "" {
-				return d, func() tea.Msg { return CloseModalMsg{} }
+			if d.revertConfirmation >= 0 {
+				// Second enter - actually revert
+				checkpoint := d.checkpoints[d.revertConfirmation]
+				d.revertConfirmation = -1
+				return d, d.revertToCheckpoint(checkpoint.ID)
 			}
 
-			if len(d.checkpoints) > 0 {
-				d.restoring = true
-				checkpoint := d.checkpoints[d.selectedIndex]
-				return d, d.restoreCheckpoint(checkpoint.ID)
+			// First enter - show confirmation
+			if _, idx := d.list.GetSelectedItem(); idx >= 0 && idx < len(d.checkpoints) {
+				d.revertConfirmation = idx
+				d.updateListItems()
+				return d, nil
 			}
+
+		case "esc", "ctrl+c":
+			if d.revertConfirmation >= 0 {
+				// Cancel confirmation
+				d.revertConfirmation = -1
+				d.updateListItems()
+				return d, nil
+			}
+			// Close dialog
+			return d, util.CmdHandler(modal.CloseModalMsg{})
+		}
+
+		// Reset confirmation on navigation
+		if d.revertConfirmation >= 0 && (msg.String() == "up" || msg.String() == "down" ||
+			msg.String() == "k" || msg.String() == "j") {
+			d.revertConfirmation = -1
+			d.updateListItems()
 		}
 	}
 
-	return d, nil
+	// Update list
+	var cmd tea.Cmd
+	listModel, cmd := d.list.Update(msg)
+	d.list = listModel.(list.List[checkpointItem])
+	return d, cmd
 }
 
-// View renders the dialog
+func (d *revertDialog) updateListItems() {
+	var items []checkpointItem
+	for i, cp := range d.checkpoints {
+		items = append(items, checkpointItem{
+			checkpoint:   cp,
+			isConfirming: i == d.revertConfirmation,
+		})
+	}
+
+	// Preserve current selection
+	_, currentIdx := d.list.GetSelectedItem()
+	d.list.SetItems(items)
+	d.list.SetSelectedIndex(currentIdx)
+}
+
+func (d *revertDialog) revertToCheckpoint(checkpointID string) tea.Cmd {
+	return func() tea.Msg {
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+
+		slog.Debug("Reverting to checkpoint", "checkpointID", checkpointID)
+
+		err := d.app.CheckpointService.RestoreCheckpoint(ctx, checkpointID)
+		if err != nil {
+			slog.Error("Failed to revert checkpoint", "error", err)
+			return toast.NewErrorToast("Failed to revert: " + err.Error())()
+		}
+
+		return checkpointRevertedMsg{}
+	}
+}
+
 func (d *revertDialog) View() string {
-	var content strings.Builder
-
 	if d.loading {
-		content.WriteString(lipgloss.NewStyle().
-			Foreground(lipgloss.Color("#666666")).
-			Render("Loading checkpoints..."))
-	} else if d.restoring {
-		content.WriteString(lipgloss.NewStyle().
-			Foreground(lipgloss.Color("#7D56F4")).
-			Render("Restoring checkpoint..."))
-	} else if d.error != "" {
-		content.WriteString(lipgloss.NewStyle().
-			Foreground(lipgloss.Color("#FF0000")).
-			Render(fmt.Sprintf("Error: %s\n\nPress Enter to close", d.error)))
-	} else if len(d.checkpoints) == 0 {
-		content.WriteString(lipgloss.NewStyle().
-			Foreground(lipgloss.Color("#666666")).
-			Render("No checkpoints available"))
-	} else {
-		// Show checkpoint list
-		content.WriteString(lipgloss.NewStyle().
-			Bold(true).
-			Render("Select a checkpoint to revert to:"))
-		content.WriteString("\n\n")
-
-		for i, cp := range d.checkpoints {
-			// Format checkpoint display
-			t := time.Unix(cp.Timestamp/1000, 0)
-			timeAgo := time.Since(t).Round(time.Minute)
-
-			var timeStr string
-			if timeAgo < time.Hour {
-				timeStr = fmt.Sprintf("%d minutes ago", int(timeAgo.Minutes()))
-			} else if timeAgo < 24*time.Hour {
-				timeStr = fmt.Sprintf("%d hours ago", int(timeAgo.Hours()))
-			} else {
-				timeStr = fmt.Sprintf("%d days ago", int(timeAgo.Hours()/24))
-			}
-
-			// Show user prompt or description
-			title := cp.Description
-			if cp.Metadata.UserPrompt != "" {
-				title = cp.Metadata.UserPrompt
-				if len(title) > 60 {
-					title = title[:57] + "..."
-				}
-			}
-
-			// Format the line
-			line := fmt.Sprintf("%s\n  %s • %d files", title, timeStr, cp.Metadata.FileCount)
-
-			// Apply selection styling
-			if i == d.selectedIndex {
-				line = lipgloss.NewStyle().
-					Background(lipgloss.Color("#7D56F4")).
-					Foreground(lipgloss.Color("#FFFFFF")).
-					PaddingLeft(1).
-					PaddingRight(1).
-					Render(line)
-			} else {
-				line = lipgloss.NewStyle().
-					PaddingLeft(1).
-					Render(line)
-			}
-
-			content.WriteString(line)
-			if i < len(d.checkpoints)-1 {
-				content.WriteString("\n\n")
-			}
-		}
-
-		content.WriteString("\n\n")
-		content.WriteString(lipgloss.NewStyle().
-			Foreground(lipgloss.Color("#666666")).
-			Render("↑/↓ to navigate • Enter to restore • Esc to cancel"))
+		return "Loading checkpoints..."
 	}
 
-	// Create dialog box
-	dialogStyle := lipgloss.NewStyle().
-		Border(lipgloss.RoundedBorder()).
-		BorderForeground(lipgloss.Color("#666666")).
-		Padding(1, 2)
-
-	// Set appropriate size
-	if d.error != "" || d.loading || d.restoring || len(d.checkpoints) == 0 {
-		dialogStyle = dialogStyle.Width(60).Height(7)
-	} else {
-		// Calculate height based on content
-		lines := strings.Count(content.String(), "\n") + 4
-		dialogStyle = dialogStyle.
-			Width(70).
-			Height(min(lines, 20))
+	if d.error != nil {
+		return fmt.Sprintf("Error loading checkpoints: %v\n\nPress any key to close", d.error)
 	}
 
-	return dialogStyle.Render(content.String())
+	content := d.list.View()
+
+	// Add help text at bottom
+	t := theme.CurrentTheme()
+	helpText := styles.NewStyle().Foreground(t.TextMuted()).Render("Enter to revert • Esc to cancel")
+
+	return content + "\n\n" + helpText
 }
 
-// SetSize sets the dialog size
 func (d *revertDialog) SetSize(width, height int) {
 	d.width = width
 	d.height = height
 }
 
-// Render renders the dialog with background
 func (d *revertDialog) Render(background string) string {
-	if d.width > 0 && d.height > 0 {
-		dialog := d.View()
-		return lipgloss.Place(d.width, d.height, lipgloss.Center, lipgloss.Center, dialog)
-	}
-	return d.View()
+	content := d.View()
+	return d.modal.Render(content, background)
 }
 
-// Close closes the dialog
 func (d *revertDialog) Close() tea.Cmd {
-	return func() tea.Msg { return CloseModalMsg{} }
+	return nil
 }
 
-// Helper function
-func min(a, b int) int {
-	if a < b {
-		return a
+// NewRevertDialog creates a new checkpoint revert dialog
+func NewRevertDialog(app *app.App) RevertDialog {
+	if app.Session == nil {
+		slog.Error("No active session for revert dialog")
+		// Return a dialog that shows error
+		emptyList := list.NewListComponent(
+			[]checkpointItem{},
+			10,
+			"No active session",
+			false,
+		)
+
+		dialog := &revertDialog{
+			app:                app,
+			list:               emptyList,
+			revertConfirmation: -1,
+			error:              fmt.Errorf("no active session"),
+		}
+
+		dialog.modal = modal.New(
+			modal.WithTitle("Revert to Checkpoint"),
+			modal.WithMaxWidth(layout.Current.Container.Width-8),
+		)
+		return dialog
 	}
-	return b
+
+	// Create empty list that will be populated after loading
+	listComponent := list.NewListComponent(
+		[]checkpointItem{},
+		10, // maxVisibleItems
+		"Loading checkpoints...",
+		false, // don't use alphanumeric keys
+	)
+	listComponent.SetMaxWidth(layout.Current.Container.Width - 12)
+
+	dialog := &revertDialog{
+		app:                app,
+		list:               listComponent,
+		revertConfirmation: -1,
+		loading:            true,
+	}
+
+	dialog.modal = modal.New(
+		modal.WithTitle("Revert to Checkpoint"),
+		modal.WithMaxWidth(layout.Current.Container.Width-8),
+	)
+
+	return dialog
 }
 
 // CloseModalMsg is sent when modal should close
