@@ -107,7 +107,7 @@ export const TaskTool = Tool.define({
         } else {
           // Ultimate fallback
           metadata = {
-            modelID: "claude-3-5-sonnet-20241022",
+            modelID: "claude-sonnet-4",
             providerID: "anthropic",
           }
         }
