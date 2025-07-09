@@ -1352,6 +1352,7 @@ func (a appModel) executeCommand(command commands.Command) (tea.Model, tea.Cmd) 
 		}
 		revertDialog := dialog.NewRevertDialog(a.app)
 		a.modal = revertDialog
+		cmds = append(cmds, revertDialog.Init()) // Critical: Execute initial command!
 	}
 	return a, tea.Batch(cmds...)
 }
