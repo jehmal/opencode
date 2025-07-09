@@ -72,42 +72,13 @@ export const TaskTool = Tool.define({
     // Create a sub-session with the current session as parent
     const subSession = await Session.create(ctx.sessionID)
 
-    // Try to get model info from the current message, but fall back to parent session's last message
-    let metadata: any
-    let msg: any
-    try {
-      msg = await Session.getMessage(ctx.sessionID, ctx.messageID)
-      metadata = msg.metadata.assistant
-    } catch (e) {
-      Debug.log(
-        "[TASK] Could not get message metadata, using parent session's last assistant message",
-      )
-    }
+    // Get the parent message metadata - this is what was working in the original code
+    const msg = await Session.getMessage(ctx.sessionID, ctx.messageID)
+    const metadata = msg.metadata.assistant!
 
-    // If we don't have metadata, get it from the parent session's messages
-    if (!metadata || !metadata.modelID || !metadata.providerID) {
-      const parentMessages = await Session.messages(ctx.sessionID)
-      const lastAssistantMsg = parentMessages
-        .reverse()
-        .find((m) => m.metadata.assistant)
-      if (lastAssistantMsg?.metadata.assistant) {
-        metadata = lastAssistantMsg.metadata.assistant
-      } else {
-        // Use the same pattern as the main session - get the default model
-        const { Provider } = await import("../provider/provider")
-        const defaultModel = await Provider.defaultModel()
-        metadata = {
-          modelID: defaultModel.modelID,
-          providerID: defaultModel.providerID,
-        }
-      }
-    }
-
-    Debug.log("[TASK] Using model configuration:", {
+    Debug.log("[TASK] Using model configuration from parent message:", {
       modelID: metadata.modelID,
       providerID: metadata.providerID,
-      source:
-        metadata === msg?.metadata?.assistant ? "current message" : "fallback",
     })
 
     // Set the agent mode for this sub-session
