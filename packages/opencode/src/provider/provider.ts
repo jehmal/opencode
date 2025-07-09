@@ -40,7 +40,13 @@ export namespace Provider {
 
   const CUSTOM_LOADERS: Record<string, CustomLoader> = {
     async anthropic(provider) {
+      log.info("Anthropic custom loader called", { 
+        hasProvider: !!provider,
+        modelCount: provider ? Object.keys(provider.models).length : 0
+      })
+      
       const access = await AuthAnthropic.access()
+      log.info("Anthropic auth check", { hasAccess: !!access })
       
       // Set zero cost for all models when using OAuth
       for (const model of Object.values(provider.models)) {
@@ -322,7 +328,13 @@ export namespace Provider {
     // load custom
     for (const [providerID, fn] of Object.entries(CUSTOM_LOADERS)) {
       if (disabled.has(providerID)) continue
+      log.info("Loading custom provider", { providerID })
       const result = await fn(database[providerID])
+      log.info("Custom loader result", { 
+        providerID, 
+        autoload: result?.autoload,
+        hasOptions: !!result?.options
+      })
       if (result && result.autoload) {
         mergeProvider(
           providerID,
@@ -330,6 +342,7 @@ export namespace Provider {
           "custom",
           result.getModel,
         )
+        log.info("Custom provider registered", { providerID })
       }
     }
 
@@ -387,7 +400,14 @@ export namespace Provider {
     })
 
     const provider = s.providers[providerID]
-    if (!provider) throw new ModelNotFoundError({ providerID, modelID })
+    if (!provider) {
+      log.error("Provider not found", {
+        providerID,
+        availableProviders: Object.keys(s.providers),
+        requestedModel: modelID,
+      })
+      throw new ModelNotFoundError({ providerID, modelID })
+    }
     const info = provider.info.models[modelID]
     if (!info) throw new ModelNotFoundError({ providerID, modelID })
     const sdk = await getSDK(provider.info)
