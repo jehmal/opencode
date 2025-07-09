@@ -1,32 +1,62 @@
 {
   "$schema": "https://json.schemastore.org/package.json",
   "name": "@opencode/dgm-integration",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "type": "module",
   "private": true,
-  "description": "DGM integration package for OpenCode - enables Python subprocess communication for enhanced tool capabilities",
+  "description": "DGM Integration Package for DGMO-DGM Phase 1 integration - enables Python subprocess communication and JSON-RPC for enhanced tool capabilities",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
   "scripts": {
-    "typecheck": "tsc --noEmit",
-    "dev": "bun run ./src/index.ts",
+    "build": "bun run clean && bun run compile",
+    "clean": "rm -rf dist",
+    "compile": "tsc",
+    "dev": "tsc --watch",
     "test": "bun test",
-    "build": "tsc"
+    "test:watch": "bun test --watch",
+    "lint": "tsc --noEmit",
+    "typecheck": "tsc --noEmit",
+    "prepare": "bun run build"
   },
   "exports": {
-    ".": "./src/index.ts",
-    "./performance": "./src/performance.ts",
-    "./dgm-bridge": "./src/dgm-bridge.ts",
-    "./tool-sync": "./src/tool-sync.ts"
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.js"
+    },
+    "./schemas": {
+      "types": "./dist/schemas/index.d.ts",
+      "import": "./dist/schemas/index.js"
+    },
+    "./types": {
+      "types": "./dist/types/index.d.ts",
+      "import": "./dist/types/index.js"
+    },
+    "./utils": {
+      "types": "./dist/utils/index.d.ts",
+      "import": "./dist/utils/index.js"
+    }
   },
+  "files": [
+    "dist",
+    "src",
+    "README.md"
+  ],
   "devDependencies": {
     "@tsconfig/bun": "1.0.7",
     "@types/bun": "latest",
-    "@types/node": "^20.0.0",
-    "typescript": "catalog:"
+    "@types/node": "^20.11.0",
+    "bun-types": "^1.0.0",
+    "typescript": "^5.3.3"
   },
   "dependencies": {
-    "zod": "catalog:",
+    "@open-rpc/client-js": "^1.8.1",
+    "zod": "^3.22.4",
     "remeda": "2.22.3",
     "decimal.js": "10.5.0"
+  },
+  "peerDependencies": {
+    "bun": ">=1.0.0"
   },
   "engines": {
     "node": ">=18.0.0"

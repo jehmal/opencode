@@ -1,18 +1,23 @@
-import { Debug } from "../util/debug"
-import { Tool } from "./tool"
-import DESCRIPTION from "./task.txt"
 import { z } from "zod"
-import { Session } from "../session"
 import { Bus } from "../bus"
-import { Message } from "../session/message"
 import { AgentConfig } from "../config/agent-config"
-import { SubSession } from "../session/sub-session"
 import {
-  emitTaskStarted,
-  emitTaskProgress,
+  emitDetailedTaskProgress,
+  emitTaskSummary,
+  ProgressSummarizer,
+} from "../events/detailed-task-events"
+import {
   emitTaskCompleted,
   emitTaskFailed,
+  emitTaskProgress,
+  emitTaskStarted,
 } from "../events/task-events"
+import { Session } from "../session"
+import { Message } from "../session/message"
+import { SubSession } from "../session/sub-session"
+import { Debug } from "../util/debug"
+import DESCRIPTION from "./task.txt"
+import { Tool } from "./tool"
 
 Debug.log("[TASK-TOOL] TaskTool module loaded at", new Date().toISOString())
 
@@ -26,18 +31,22 @@ export const TaskTool = Tool.define({
     prompt: z.string().describe("The task for the agent to perform"),
     agentMode: z
       .enum(["read-only", "all-tools"])
-      .optional()
-      .describe("Tool access mode for the sub-agent (defaults to read-only)"),
+      .describe("Tool access mode for the sub-agent"),
     autoDebug: z
       .boolean()
-      .optional()
-      .default(true)
       .describe("Automatically create debug agent on failure"),
     maxRetries: z
       .number()
-      .optional()
-      .default(1)
       .describe("Maximum number of automatic retry attempts"),
+    techniqueIds: z
+      .array(z.string())
+      .describe("Specific prompting techniques to use for this task"),
+    autoSelectTechniques: z
+      .boolean()
+      .describe("Automatically select best techniques for the task"),
+    techniqueStrategy: z
+      .enum(["performance", "balanced", "exploration"])
+      .describe("Strategy for technique selection"),
   }),
   async execute(params, ctx) {
     Debug.log("\n=== TASK TOOL EXECUTION STARTED ===")
@@ -160,6 +169,8 @@ export const TaskTool = Tool.define({
       const message = evt.properties.info
       let toolCount = 0
       let completedTools = 0
+      let currentToolName = ""
+      let currentToolParameters: Record<string, any> = {}
 
       if (message.parts) {
         message.parts.forEach((part) => {
@@ -170,27 +181,111 @@ export const TaskTool = Tool.define({
               part.toolInvocation?.state === "result"
             ) {
               completedTools++
+            } else if (
+              "toolInvocation" in part &&
+              part.toolInvocation?.state === "partial-call"
+            ) {
+              // Track the current tool being used
+              currentToolName = part.toolInvocation.toolName || ""
+              currentToolParameters = part.toolInvocation.args || {}
             }
           }
         })
       }
 
-      // Calculate progress based on tool completion
-      let progress = 25 // Base progress for starting
-      if (toolCount > 0) {
-        progress = Math.min(
-          25 + Math.floor((completedTools / toolCount) * 65),
-          90,
-        )
+      // Map tool names to user-friendly descriptions
+      const toolDescriptions: Record<string, string> = {
+        "mcp__qdrant__qdrant-find": "🔍 Searching project memories...",
+        Read: "📂 Reading project files...",
+        Glob: "📁 Exploring directory structure...",
+        Grep: "🔎 Analyzing codebase structure...",
+        Write: "💾 Writing changes to disk...",
+        Edit: "✏️ Applying code changes...",
+        MultiEdit: "✏️ Applying multiple edits...",
+        Bash: "🖥️ Executing command...",
+        LS: "📋 Listing directory contents...",
+        WebSearch: "🌐 Searching the web...",
+        TodoRead: "📝 Reading task list...",
+        TodoWrite: "📝 Updating task list...",
+      }
+
+      // Determine the phase based on the context
+      let phase: "prompt-generation" | "context-gathering" | "processing" =
+        "processing"
+      let statusMessage = ""
+
+      // Check if this is the continuation prompt generator task
+      const isPromptGeneration =
+        params.description.toLowerCase().includes("continuation") ||
+        params.description.toLowerCase().includes("prompt")
+
+      if (isPromptGeneration) {
+        phase = "prompt-generation"
+        if (completedTools === 0) {
+          statusMessage = "🔄 Analyzing current session..."
+        } else if (completedTools < toolCount) {
+          statusMessage = "📝 Building continuation prompt..."
+        } else {
+          statusMessage = "✅ Continuation prompt ready!"
+        }
+      } else {
+        // This is Claude's context gathering phase
+        phase = "context-gathering"
+        if (currentToolName && toolDescriptions[currentToolName]) {
+          statusMessage = toolDescriptions[currentToolName]
+        } else if (toolCount === 0) {
+          statusMessage = "🧠 Initializing..."
+        } else if (completedTools === toolCount && toolCount > 0) {
+          statusMessage = "🧠 Preparing response..."
+        } else {
+          statusMessage = "🔄 Processing request..."
+        }
       }
 
       emitTaskProgress({
         sessionID: ctx.sessionID,
         taskID,
-        progress,
-        message: `Processing (${completedTools}/${toolCount} tools completed)...`,
+        progress: 0, // We'll remove progress bars, so set to 0
+        message: statusMessage,
         timestamp: Date.now(),
         startTime: startTime,
+        phase: phase,
+        currentTool: currentToolName,
+        toolDescription: statusMessage,
+      })
+
+      // Emit enhanced progress with Claude Code style summary
+      const elapsed = Date.now() - startTime
+      const summaryLines = ProgressSummarizer.generateTaskSummary(
+        params.description,
+        currentToolName,
+        currentToolParameters,
+        phase,
+        elapsed,
+      )
+
+      emitTaskSummary({
+        sessionID: ctx.sessionID,
+        taskID,
+        agentName: params.description,
+        lines: summaryLines,
+        spinner: true,
+        timestamp: Date.now(),
+        elapsed,
+      })
+
+      emitDetailedTaskProgress({
+        sessionID: ctx.sessionID,
+        taskID,
+        agentName: params.description,
+        primaryStatus: summaryLines[0] || statusMessage,
+        secondaryStatus: summaryLines[1],
+        tertiaryStatus: summaryLines[2],
+        currentTool: currentToolName,
+        toolParameters: currentToolParameters,
+        timestamp: Date.now(),
+        startTime: startTime,
+        phase: phase as any,
       })
     })
 
@@ -215,6 +310,47 @@ export const TaskTool = Tool.define({
         startTime: startTime,
       })
 
+      // Apply prompting techniques if configured
+      let enhancedPrompt = params.prompt
+
+      if (params.techniqueIds || params.autoSelectTechniques) {
+        try {
+          const { promptingIntegration } = await import(
+            "../prompting/integration/dgmo-integration"
+          )
+
+          // Configure session with techniques
+          await promptingIntegration.configureSession({
+            sessionId: subSession.id,
+            techniques: params.techniqueIds || [],
+            autoSelect: params.autoSelectTechniques ?? true,
+            strategy: params.techniqueStrategy,
+          })
+
+          // Enhance the prompt
+          const enhancedResult = await promptingIntegration.enhancePrompt(
+            subSession.id,
+            params.prompt,
+            {
+              techniques: params.techniqueIds,
+              autoSelect: params.autoSelectTechniques,
+              strategy: params.techniqueStrategy,
+            },
+          )
+
+          enhancedPrompt = enhancedResult.content
+
+          Debug.log("[TASK] Prompt enhanced with techniques", {
+            original: params.prompt.slice(0, 100),
+            enhanced: enhancedPrompt.slice(0, 100),
+            techniques: enhancedResult.metadata.techniques,
+          })
+        } catch (error) {
+          Debug.error("[TASK] Failed to apply prompting techniques", error)
+          // Continue with original prompt
+        }
+      }
+
       const result = await Session.chat({
         sessionID: subSession.id,
         modelID: metadata.modelID,
@@ -222,7 +358,7 @@ export const TaskTool = Tool.define({
         parts: [
           {
             type: "text",
-            text: params.prompt,
+            text: enhancedPrompt,
           },
         ],
       })
@@ -246,14 +382,38 @@ export const TaskTool = Tool.define({
       )
 
       // Emit task completed event
+      const duration = Date.now() - startTime
       emitTaskCompleted({
         sessionID: ctx.sessionID,
         taskID,
-        duration: Date.now() - startTime,
+        duration,
         success: true,
         summary: output.slice(0, 200),
         timestamp: Date.now(),
       })
+
+      // Track technique performance if used
+      if (params.techniqueIds || params.autoSelectTechniques) {
+        try {
+          const { promptingIntegration } = await import(
+            "../prompting/integration/dgmo-integration"
+          )
+
+          // Calculate tokens used from the result
+          const tokensUsed = result.metadata?.assistant?.tokens?.output || 0
+
+          await promptingIntegration.trackSessionPerformance(
+            subSession.id,
+            true, // success
+            {
+              duration,
+              tokensUsed,
+            },
+          )
+        } catch (error) {
+          Debug.error("[TASK] Failed to track technique performance", error)
+        }
+      }
 
       return {
         metadata: {

@@ -6,7 +6,10 @@
   "private": true,
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "dev": "bun run ./src/index.ts"
+    "dev": "bun run ./src/index.ts",
+    "test:evolution": "bun test src/evolution/__tests__/test-evolution-e2e.ts",
+    "debug:evolution": "bun run src/evolution/__tests__/debug-evolution.ts",
+    "test:evolution:mock": "bun test src/evolution/__tests__/mock-performance-data.ts"
   },
   "bin": {
     "dgmo": "./bin/dgmo"

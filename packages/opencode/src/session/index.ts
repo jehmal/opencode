@@ -38,6 +38,7 @@ import { ProviderTransform } from "../provider/transform"
 import { SessionPerformance } from "./performance"
 import { PerformanceWrapper } from "../tool/performance-wrapper"
 import { AgentConfig } from "../config/agent-config"
+import { retry, retryStream, type RetryOptions } from "../util/retry"
 export namespace Session {
   const log = Log.create({ service: "session" })
 
@@ -151,6 +152,23 @@ export namespace Session {
     Bus.publish(Event.Updated, {
       info: result,
     })
+
+    // Initialize prompting techniques for the session
+    try {
+      const { promptingIntegration } = await import(
+        "../prompting/integration/dgmo-integration"
+      )
+      await promptingIntegration.initialize()
+      await promptingIntegration.configureSession({
+        sessionId: result.id,
+        techniques: [],
+        autoSelect: true,
+        strategy: "balanced",
+      })
+    } catch (error) {
+      log.warn("Failed to initialize prompting techniques", { error })
+    }
+
     return result
   }
 
@@ -341,33 +359,62 @@ export namespace Session {
     const app = App.info()
     const session = await get(input.sessionID)
     if (msgs.length === 0 && !session.parentID) {
-      generateText({
-        maxTokens: input.providerID === "google" ? 1024 : 20,
-        providerOptions: model.info.options,
-        messages: [
-          ...SystemPrompt.title(input.providerID).map(
-            (x): CoreMessage => ({
-              role: "system",
-              content: x,
-            }),
-          ),
-          ...convertToCoreMessages([
-            {
-              role: "user",
-              content: "",
-              parts: toParts(input.parts),
-            },
-          ]),
-        ],
-        model: model.language,
-      })
+      const welcomeSystem =
+        input.system ?? SystemPrompt.provider(input.providerID)
+      welcomeSystem.push(...(await SystemPrompt.environment()))
+      welcomeSystem.push(...(await SystemPrompt.custom()))
+
+      // Get retry config for title generation
+      const cfg = await Config.get()
+      retry(
+        () =>
+          generateText({
+            maxTokens: input.providerID === "google" ? 1024 : 20,
+            providerOptions: model.info.options,
+            messages: [
+              ...welcomeSystem.map(
+                (x): CoreMessage => ({
+                  role: "system",
+                  content: x,
+                }),
+              ),
+              ...convertToCoreMessages([
+                {
+                  role: "user",
+                  content: "",
+                  parts: toParts(input.parts),
+                },
+              ]),
+            ],
+            model: model.language,
+          }),
+        {
+          maxRetries: cfg.retry?.maxRetries ?? 10,
+          initialDelay: cfg.retry?.initialDelay ?? 1000,
+          maxDelay: cfg.retry?.maxDelay ?? 60000,
+          backoffMultiplier: cfg.retry?.backoffMultiplier ?? 2,
+          jitterFactor: cfg.retry?.jitterFactor ?? 0.1,
+          onRetry: (error, attempt) => {
+            log.info("Retrying title generation", {
+              sessionID: input.sessionID,
+              error: error?.toString(),
+              attempt,
+            })
+          },
+        },
+      )
         .then((result) => {
           if (result.text)
             return Session.update(input.sessionID, (draft) => {
               draft.title = result.text
             })
         })
-        .catch(() => {})
+        .catch((error) => {
+          log.warn("Failed to generate title after retries", {
+            sessionID: input.sessionID,
+            error: error?.toString(),
+          })
+        })
     }
     const msg: Message.Info = {
       role: "user",
@@ -384,10 +431,93 @@ export namespace Session {
     await updateMessage(msg)
     msgs.push(msg)
 
+    // Enhance the prompt with prompting techniques
+    let enhancedParts = input.parts
+    let promptingMetadata: any = {}
+
+    try {
+      const { promptingIntegration } = await import(
+        "../prompting/integration/dgmo-integration"
+      )
+
+      // Extract text from parts for analysis
+      const textParts = input.parts.filter((p) => p.type === "text")
+      if (textParts.length > 0) {
+        const originalPrompt = textParts.map((p) => p.text).join("\n")
+
+        // Get session configuration or use defaults
+        const sessionConfig = await promptingIntegration.getSessionConfig(
+          input.sessionID,
+        )
+
+        if (sessionConfig?.autoSelect || !sessionConfig) {
+          // Enhance the prompt
+          const enhanced = await promptingIntegration.enhancePrompt(
+            input.sessionID,
+            originalPrompt,
+            {
+              autoSelect: true,
+              strategy: sessionConfig?.strategy || "balanced",
+            },
+          )
+
+          // Replace text parts with enhanced version
+          enhancedParts = input.parts.map((part) => {
+            if (part.type === "text") {
+              return { ...part, text: enhanced.content }
+            }
+            return part
+          })
+
+          // Store metadata for the assistant message
+          promptingMetadata = {
+            techniques: enhanced.metadata.techniques,
+            originalPrompt,
+            enhancedPrompt: enhanced.content,
+            selectionMode: "auto",
+            confidence: enhanced.metadata.confidence,
+          }
+
+          l.info("Prompt enhanced with techniques", {
+            techniques: enhanced.metadata.techniques,
+            confidence: enhanced.metadata.confidence,
+          })
+
+          // Debug: Log the prompting metadata that will be sent
+          l.info("Prompting metadata for assistant message", {
+            promptingMetadata,
+          })
+
+          // Debug: Log what will be sent as modelID
+          l.info("ModelID with techniques", {
+            originalModelID: input.modelID,
+            enhancedModelID: `${input.modelID}|TECHNIQUES:${promptingMetadata.techniques.join(",")}`,
+            techniqueCount: promptingMetadata.techniques.length,
+          })
+
+          // Debug: Log the prompting metadata that will be sent
+          l.info("Prompting metadata for assistant message", {
+            promptingMetadata,
+          })
+
+          // Debug: Log what will be sent as modelID
+          l.info("ModelID with techniques", {
+            originalModelID: input.modelID,
+            enhancedModelID: `${input.modelID}|TECHNIQUES:${promptingMetadata.techniques.join(",")}`,
+            techniqueCount: promptingMetadata.techniques.length,
+          })
+        }
+      }
+    } catch (error: any) {
+      l.warn("Failed to enhance prompt with techniques", { error })
+    }
+
+    // Don't update the user message - keep the original prompt visible
+    // The enhanced prompt will be sent to the model but not shown in UI
+
     const system = input.system ?? SystemPrompt.provider(input.providerID)
     system.push(...(await SystemPrompt.environment()))
     system.push(...(await SystemPrompt.custom()))
-
     const next: Message.Info = {
       id: Identifier.ascending("message"),
       role: "assistant",
@@ -406,8 +536,18 @@ export namespace Session {
             reasoning: 0,
             cache: { read: 0, write: 0 },
           },
-          modelID: input.modelID,
+          // WORKAROUND: Append technique info to modelID for UI display
+          // This allows the UI to extract and display technique abbreviations
+          // Format: "model-name|TECHNIQUES:tech1,tech2"
+          modelID:
+            promptingMetadata.techniques &&
+            promptingMetadata.techniques.length > 0
+              ? `${input.modelID}|TECHNIQUES:${promptingMetadata.techniques.join(",")}`
+              : input.modelID,
           providerID: input.providerID,
+          prompting: promptingMetadata.techniques
+            ? promptingMetadata
+            : undefined,
         },
         time: {
           created: Date.now(),
@@ -546,95 +686,143 @@ export namespace Session {
       tools[key] = item
     }
 
-    let text: Message.TextPart | undefined
-    const result = streamText({
-      onStepFinish: async (step) => {
-        log.info("step finish", { finishReason: step.finishReason })
-        const assistant = next.metadata!.assistant!
-        const usage = getUsage(model.info, step.usage, step.providerMetadata)
-        assistant.cost += usage.cost
-        assistant.tokens = usage.tokens
-        await updateMessage(next)
-        if (text) {
-          Bus.publish(Message.Event.PartUpdated, {
-            part: text,
-            messageID: next.id,
-            sessionID: next.metadata.sessionID,
-          })
-        }
-        text = undefined
-      },
-      onError(err) {
-        log.error("callback error", err)
-        switch (true) {
-          case LoadAPIKeyError.isInstance(err.error):
-            next.metadata.error = new Provider.AuthError(
-              {
-                providerID: input.providerID,
-                message: err.error.message,
-              },
-              { cause: err.error },
-            ).toObject()
-            break
-          case err.error instanceof Error:
-            next.metadata.error = new NamedError.Unknown(
-              { message: err.error.toString() },
-              { cause: err.error },
-            ).toObject()
-            break
-          default:
-            next.metadata.error = new NamedError.Unknown(
-              { message: JSON.stringify(err.error) },
-              { cause: err.error },
-            )
-        }
-        Bus.publish(Event.Error, {
-          error: next.metadata.error,
+    // Get retry configuration
+    const config = await Config.get()
+    const retryOptions: RetryOptions = {
+      maxRetries: config.retry?.maxRetries ?? 10,
+      initialDelay: config.retry?.initialDelay ?? 1000,
+      maxDelay: config.retry?.maxDelay ?? 60000,
+      backoffMultiplier: config.retry?.backoffMultiplier ?? 2,
+      jitterFactor: config.retry?.jitterFactor ?? 0.1,
+      signal: abort.signal,
+      onRetry: (error, attempt, delay) => {
+        log.warn("Retrying API call due to error", {
+          sessionID: input.sessionID,
+          error: error?.toString(),
+          attempt,
+          delayMs: delay,
+          providerID: input.providerID,
+          modelID: input.modelID,
         })
+
+        // Notify user about retry via a system message part
+        const retryPart: Message.TextPart = {
+          type: "text",
+          text: `\n\n[System: Retrying due to API overload. Attempt ${attempt + 1}/${retryOptions.maxRetries}. Waiting ${Math.round(delay / 1000)}s...]\n\n`,
+        }
+        next.parts.push(retryPart)
+        updateMessage(next).catch(() => {})
       },
-      // async prepareStep(step) {
-      //   next.parts.push({
-      //     type: "step-start",
-      //   })
-      //   await updateMessage(next)
-      //   return step
-      // },
-      toolCallStreaming: true,
-      maxTokens: Math.max(0, model.info.limit.output) || undefined,
-      abortSignal: abort.signal,
-      maxSteps: 1000,
-      providerOptions: model.info.options,
-      messages: [
-        ...system.map(
-          (x): CoreMessage => ({
-            role: "system",
-            content: x,
-          }),
-        ),
-        ...convertToCoreMessages(
-          msgs.map(toUIMessage).filter((x) => x.parts.length > 0),
-        ),
-      ],
-      temperature: model.info.temperature ? 0 : undefined,
-      tools: model.info.tool_call === false ? undefined : tools,
-      model: wrapLanguageModel({
-        model: model.language,
-        middleware: [
-          {
-            async transformParams(args) {
-              if (args.type === "stream") {
-                args.params.prompt = ProviderTransform.message(
-                  args.params.prompt,
-                  input.providerID,
-                  input.modelID,
-                )
-              }
-              return args.params
-            },
+    }
+
+    let text: Message.TextPart | undefined
+    const result = await retryStream(
+      () =>
+        streamText({
+          onStepFinish: async (step) => {
+            log.info("step finish", { finishReason: step.finishReason })
+            const assistant = next.metadata!.assistant!
+            const usage = getUsage(
+              model.info,
+              step.usage,
+              step.providerMetadata,
+            )
+            assistant.cost += usage.cost
+            assistant.tokens = usage.tokens
+            await updateMessage(next)
+            if (text) {
+              Bus.publish(Message.Event.PartUpdated, {
+                part: text,
+                messageID: next.id,
+                sessionID: next.metadata.sessionID,
+              })
+            }
+            text = undefined
           },
-        ],
-      }),
-    })
+          onError(err) {
+            log.error("callback error", err)
+            switch (true) {
+              case LoadAPIKeyError.isInstance(err.error):
+                next.metadata.error = new Provider.AuthError(
+                  {
+                    providerID: input.providerID,
+                    message: err.error.message,
+                  },
+                  { cause: err.error },
+                ).toObject()
+                break
+              case err.error instanceof Error:
+                next.metadata.error = new NamedError.Unknown(
+                  { message: err.error.toString() },
+                  { cause: err.error },
+                ).toObject()
+                break
+              default:
+                next.metadata.error = new NamedError.Unknown(
+                  { message: JSON.stringify(err.error) },
+                  { cause: err.error },
+                )
+            }
+            Bus.publish(Event.Error, {
+              error: next.metadata.error,
+            })
+          },
+          // async prepareStep(step) {
+          //   next.parts.push({
+          //     type: "step-start",
+          //   })
+          //   await updateMessage(next)
+          //   return step
+          // },
+          toolCallStreaming: true,
+          maxTokens: Math.max(0, model.info.limit.output) || undefined,
+          abortSignal: abort.signal,
+          maxSteps: 1000,
+          providerOptions: model.info.options,
+          messages: [
+            ...system.map(
+              (x): CoreMessage => ({
+                role: "system",
+                content: x,
+              }),
+            ),
+            ...convertToCoreMessages(
+              msgs
+                .map((msg, idx) => {
+                  // For the last message (current user message), use enhanced parts if available
+                  if (
+                    idx === msgs.length - 1 &&
+                    enhancedParts !== input.parts
+                  ) {
+                    return toUIMessage({ ...msg, parts: enhancedParts })
+                  }
+                  return toUIMessage(msg)
+                })
+                .filter((x) => x.parts.length > 0),
+            ),
+          ],
+          temperature: model.info.temperature ? 0 : undefined,
+          tools: model.info.tool_call === false ? undefined : tools,
+          model: wrapLanguageModel({
+            model: model.language,
+            middleware: [
+              {
+                async transformParams(args) {
+                  if (args.type === "stream") {
+                    args.params.prompt = ProviderTransform.message(
+                      args.params.prompt,
+                      input.providerID,
+                      input.modelID,
+                    )
+                  }
+                  return args.params
+                },
+              },
+            ],
+          }),
+        }),
+      retryOptions,
+    )
     try {
       for await (const value of result.fullStream) {
         l.info("part", {
@@ -794,6 +982,30 @@ export namespace Session {
       }
     }
     await updateMessage(next)
+
+    // Auto-checkpoint after assistant response
+    if (next.role === "assistant" && !session.parentID) {
+      try {
+        const { CheckpointManager } = await import(
+          "../checkpoint/checkpoint-manager"
+        )
+        const lastUserMessage = msgs
+          .slice(0, -1)
+          .reverse()
+          .find((m) => m.role === "user")
+        const textPart = lastUserMessage?.parts.find((p) => p.type === "text")
+        const description = textPart?.text?.slice(0, 100) || "Auto-checkpoint"
+        await CheckpointManager.createCheckpoint(
+          input.sessionID,
+          next.id,
+          description,
+        )
+        log.info("Auto-checkpoint created after assistant response")
+      } catch (error) {
+        log.error("Failed to create auto-checkpoint", { error })
+      }
+    }
+
     return next
   }
 
@@ -843,52 +1055,83 @@ export namespace Session {
     }
     await updateMessage(next)
 
+    // Get retry configuration for summarization
+    const config = await Config.get()
+    const retryOptions: RetryOptions = {
+      maxRetries: config.retry?.maxRetries ?? 10,
+      initialDelay: config.retry?.initialDelay ?? 1000,
+      maxDelay: config.retry?.maxDelay ?? 60000,
+      backoffMultiplier: config.retry?.backoffMultiplier ?? 2,
+      jitterFactor: config.retry?.jitterFactor ?? 0.1,
+      signal: abort.signal,
+      onRetry: (error, attempt, delay) => {
+        log.warn("Retrying summarization due to error", {
+          sessionID: input.sessionID,
+          error: error?.toString(),
+          attempt,
+          delayMs: delay,
+        })
+      },
+    }
+
     let text: Message.TextPart | undefined
-    const result = streamText({
-      abortSignal: abort.signal,
-      model: model.language,
-      messages: [
-        ...system.map(
-          (x): CoreMessage => ({
-            role: "system",
-            content: x,
-          }),
-        ),
-        ...convertToCoreMessages(filtered.map(toUIMessage)),
-        {
-          role: "user",
-          content: [
+    const result = await retryStream(
+      () =>
+        streamText({
+          abortSignal: abort.signal,
+          model: model.language,
+          messages: [
+            ...system.map(
+              (x): CoreMessage => ({
+                role: "system",
+                content: x,
+              }),
+            ),
+            ...convertToCoreMessages(filtered.map(toUIMessage)),
             {
-              type: "text",
-              text: "Provide a detailed but concise summary of our conversation above. Focus on information that would be helpful for continuing the conversation, including what we did, what we're doing, which files we're working on, and what we're going to do next.",
+              role: "user",
+              content: [
+                {
+                  type: "text",
+                  text: "Provide a detailed but concise summary of our conversation above. Focus on information that would be helpful for continuing the conversation, including what we did, what we're doing, which files we're working on, and what we're going to do next.",
+                },
+              ],
             },
           ],
-        },
-      ],
-      onStepFinish: async (step) => {
-        const assistant = next.metadata!.assistant!
-        const usage = getUsage(model.info, step.usage, step.providerMetadata)
-        assistant.cost += usage.cost
-        assistant.tokens = usage.tokens
-        await updateMessage(next)
-        if (text) {
-          Bus.publish(Message.Event.PartUpdated, {
-            part: text,
-            messageID: next.id,
-            sessionID: next.metadata.sessionID,
-          })
-        }
-        text = undefined
-      },
-      async onFinish(input) {
-        const assistant = next.metadata!.assistant!
-        const usage = getUsage(model.info, input.usage, input.providerMetadata)
-        assistant.cost += usage.cost
-        assistant.tokens = usage.tokens
-        next.metadata!.time.completed = Date.now()
-        await updateMessage(next)
-      },
-    })
+          onStepFinish: async (step) => {
+            const assistant = next.metadata!.assistant!
+            const usage = getUsage(
+              model.info,
+              step.usage,
+              step.providerMetadata,
+            )
+            assistant.cost += usage.cost
+            assistant.tokens = usage.tokens
+            await updateMessage(next)
+            if (text) {
+              Bus.publish(Message.Event.PartUpdated, {
+                part: text,
+                messageID: next.id,
+                sessionID: next.metadata.sessionID,
+              })
+            }
+            text = undefined
+          },
+          async onFinish(input) {
+            const assistant = next.metadata!.assistant!
+            const usage = getUsage(
+              model.info,
+              input.usage,
+              input.providerMetadata,
+            )
+            assistant.cost += usage.cost
+            assistant.tokens = usage.tokens
+            next.metadata!.time.completed = Date.now()
+            await updateMessage(next)
+          },
+        }),
+      retryOptions,
+    )
 
     for await (const value of result.fullStream) {
       switch (value.type) {

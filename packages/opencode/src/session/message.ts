@@ -191,6 +191,15 @@ export namespace Message {
                   write: z.number(),
                 }),
               }),
+              prompting: z
+                .object({
+                  techniques: z.string().array(),
+                  originalPrompt: z.string(),
+                  enhancedPrompt: z.string(),
+                  selectionMode: z.string(),
+                  confidence: z.number(),
+                })
+                .optional(),
             })
             .optional(),
         })

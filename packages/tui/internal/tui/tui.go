@@ -22,6 +22,7 @@ import (
 	"github.com/sst/dgmo/internal/components/clipboard"
 	cmdcomp "github.com/sst/dgmo/internal/components/commands"
 	"github.com/sst/dgmo/internal/components/dialog"
+	"github.com/sst/dgmo/internal/components/mcp"
 	"github.com/sst/dgmo/internal/components/modal"
 	"github.com/sst/dgmo/internal/components/status"
 	"github.com/sst/dgmo/internal/components/toast"
@@ -47,9 +48,11 @@ const interruptDebounceTimeout = 1 * time.Second
 
 // ContinuationPromptProgressMsg is sent when continuation prompt generation makes progress
 type ContinuationPromptProgressMsg struct {
-	TaskID   string
-	Progress int
-	Message  string
+	TaskID      string
+	Progress    int
+	Message     string
+	Phase       string
+	CurrentTool string
 }
 
 // ContinuationPromptCompletedMsg is sent when continuation prompt generation completes
@@ -61,23 +64,31 @@ type ContinuationPromptCompletedMsg struct {
 }
 
 type appModel struct {
-	width, height        int
-	app                  *app.App
-	modal                layout.Modal
-	status               status.StatusComponent
-	editor               chat.EditorComponent
-	messages             chat.MessagesComponent
+	width, height int
+	app           *app.App
+	modal         layout.Modal
+	status        status.StatusComponent
+	editor        chat.EditorComponent
+	messages      chat.MessagesComponent
+	mcpPanel      mcp.MCPPanelComponent
+
 	completions          dialog.CompletionDialog
 	completionManager    *completions.CompletionManager
 	showCompletionDialog bool
-	leaderBinding        *key.Binding
-	isLeaderSequence     bool
-	toastManager         *toast.ToastManager
-	clipboardManager     *clipboard.ClipboardManager
-	interruptKeyState    InterruptKeyState
-	lastScroll           time.Time
-	isCtrlBSequence      bool // Track if Ctrl+B was pressed for multi-key sequences
-	isAltScreen          bool // Track alternate screen state - starts false
+	showMCPPanel         bool
+
+	leaderBinding                 *key.Binding
+	isLeaderSequence              bool
+	toastManager                  *toast.ToastManager
+	clipboardManager              *clipboard.ClipboardManager
+	interruptKeyState             InterruptKeyState
+	lastScroll                    time.Time
+	isCtrlBSequence               bool                  // Track if Ctrl+B was pressed for multi-key sequences
+	isAltScreen                   bool                  // Track alternate screen state - starts false
+	continuationTaskID            string                // Track active continuation prompt task ID
+	continuationPrompt            string                // Store the continuation prompt until task completes
+	pendingContinuationCompletion *app.TaskCompletedMsg // Store early-arriving continuation task completion
+
 }
 
 func (a appModel) Init() tea.Cmd {
@@ -90,6 +101,7 @@ func (a appModel) Init() tea.Cmd {
 	cmds = append(cmds, a.app.InitializeProvider())
 	cmds = append(cmds, a.editor.Init())
 	cmds = append(cmds, a.messages.Init())
+	cmds = append(cmds, a.mcpPanel.Init())
 	cmds = append(cmds, a.status.Init())
 	cmds = append(cmds, a.completions.Init())
 	cmds = append(cmds, a.toastManager.Init())
@@ -161,6 +173,17 @@ func (a appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				toastMsg = "Fullscreen mode disabled"
 			}
 			return a, tea.Batch(cmd, toast.NewInfoToast(toastMsg))
+		}
+
+		// 2.5. Handle MCP panel toggle (Ctrl+M)
+		if keyString == "ctrl+m" {
+			a.showMCPPanel = !a.showMCPPanel
+			a.mcpPanel.SetVisible(a.showMCPPanel)
+			toastMsg := "MCP panel enabled"
+			if !a.showMCPPanel {
+				toastMsg = "MCP panel disabled"
+			}
+			return a, toast.NewInfoToast(toastMsg)
 		}
 
 		// 3. Check for commands that require leader
@@ -439,9 +462,14 @@ func (a appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			},
 		}
 		// Update child component sizes
-		messagesHeight := a.height - 6 // Leave room for editor and status bar
+		mcpPanelHeight := 0
+		if a.showMCPPanel {
+			mcpPanelHeight = 6 // Height for MCP panel
+		}
+		messagesHeight := a.height - 6 - mcpPanelHeight // Leave room for editor, status bar, and MCP panel
 		a.messages.SetSize(a.width, messagesHeight)
 		a.editor.SetSize(min(a.width, 80), 5)
+		a.mcpPanel.SetSize(a.width, mcpPanelHeight)
 	case app.SessionSelectedMsg:
 		messages, err := a.app.ListMessages(context.Background(), msg.ID)
 		if err != nil {
@@ -500,8 +528,26 @@ func (a appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		a.interruptKeyState = InterruptKeyIdle
 		a.editor.SetInterruptKeyInDebounce(false)
 	case app.TaskStartedMsg:
-		// Task started - update progress to 0
+		// DEBUG: Log task started events
+		slog.Info("[CONTINUATION DEBUG] TaskStartedMsg received",
+			"taskID", msg.Task.ID,
+			"sessionID", msg.Task.SessionID,
+			"agentNumber", msg.Task.AgentNumber,
+			"currentSessionID", func() string {
+				if a.app.Session != nil {
+					return a.app.Session.ID
+				}
+				return "<no session>"
+			}(),
+			"isContinuationTask", strings.HasPrefix(msg.Task.ID, "continuation-"))
+
+		// Only process if this task belongs to current session
+		if a.app.Session != nil && msg.Task.SessionID != "" && msg.Task.SessionID != a.app.Session.ID {
+			return a, nil // Ignore events from other sessions
+		}
+		// Task started - update progress to 0 and register agent number
 		chat.UpdateTaskProgress(msg.Task.ID, 0)
+		chat.RegisterTaskAgent(msg.Task.ID, msg.Task.SessionID, msg.Task.AgentNumber)
 		// Check if this is a continuation prompt task
 		if strings.HasPrefix(msg.Task.ID, "continuation-") {
 			// Don't show generic task toast for continuation prompts
@@ -515,16 +561,40 @@ func (a appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			))
 		}
 	case app.TaskProgressMsg:
-		// Update task progress
+		// DEBUG: Log task progress for continuation tasks
+		if strings.HasPrefix(msg.TaskID, "continuation-") {
+			slog.Info("[CONTINUATION DEBUG] TaskProgressMsg for continuation task",
+				"taskID", msg.TaskID,
+				"progress", msg.Progress,
+				"phase", msg.Phase,
+				"message", msg.Message)
+		}
+
+		// Only process if this task belongs to current session
+		if a.app.Session != nil && msg.SessionID != "" && msg.SessionID != a.app.Session.ID {
+			return a, nil // Ignore events from other sessions
+		}
+		// Update task progress and metadata
 		chat.UpdateTaskProgress(msg.TaskID, msg.Progress)
+		if msg.Message != "" {
+			chat.UpdateTaskMessage(msg.TaskID, msg.Message)
+		}
+		if msg.Phase != "" {
+			chat.UpdateTaskPhase(msg.TaskID, msg.Phase)
+		}
+		if msg.CurrentTool != "" {
+			chat.UpdateTaskTool(msg.TaskID, msg.CurrentTool)
+		}
 		// Check if this is a continuation prompt task
 		if strings.HasPrefix(msg.TaskID, "continuation-") {
 			// Convert to ContinuationPromptProgressMsg for special handling
 			cmds = append(cmds, func() tea.Msg {
 				return ContinuationPromptProgressMsg{
-					TaskID:   msg.TaskID,
-					Progress: msg.Progress,
-					Message:  msg.Message,
+					TaskID:      msg.TaskID,
+					Progress:    msg.Progress,
+					Message:     msg.Message,
+					Phase:       msg.Phase,
+					CurrentTool: msg.CurrentTool,
 				}
 			})
 		} else {
@@ -541,15 +611,83 @@ func (a appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			))
 		}
 	case app.TaskCompletedMsg:
-		// Task completed - set progress to 100
-		chat.UpdateTaskProgress(msg.TaskID, 100)
-		// Check if this is a continuation prompt task
-		if strings.HasPrefix(msg.TaskID, "continuation-") {
-			// For continuation prompt tasks, we need to get the actual prompt
-			// Since we don't have it in TaskCompletedMsg, just show success
-			// The actual prompt was already handled by the HTTP response
+		// DEBUG: Log all task completion events
+		slog.Info("[CONTINUATION DEBUG] TaskCompletedMsg received",
+			"taskID", msg.TaskID,
+			"sessionID", msg.SessionID,
+			"waitingForTaskID", a.continuationTaskID,
+			"isMatch", msg.TaskID == a.continuationTaskID,
+			"success", msg.Success,
+			"isContinuationTask", strings.HasPrefix(msg.TaskID, "continuation-"))
+
+		// Check if this is a continuation task but we don't have the ID yet
+		if strings.HasPrefix(msg.TaskID, "continuation-") && a.continuationTaskID == "" {
+			// Store this event for later processing
+			slog.Info("[CONTINUATION DEBUG] Storing pending continuation completion",
+				"taskID", msg.TaskID,
+				"sessionID", msg.SessionID)
+			msgCopy := msg // Make a copy
+			a.pendingContinuationCompletion = &msgCopy
 			return a, nil
 		}
+
+		// Check if this is our continuation prompt task
+		if a.continuationTaskID != "" && msg.TaskID == a.continuationTaskID {
+			// DEBUG: Log that we matched the task
+			slog.Info("[CONTINUATION DEBUG] Matched continuation task! Creating new session",
+				"taskID", msg.TaskID,
+				"promptAvailable", len(a.continuationPrompt) > 0)
+
+			// This is our continuation prompt task completing
+			// Now we can create the new session and send the prompt
+
+			// Create a new session for the continuation
+			session, err := a.app.CreateSession(context.Background())
+			if err != nil {
+				slog.Error("[CONTINUATION DEBUG] Failed to create new session", "error", err)
+				cmds = append(cmds, toast.NewErrorToast("Failed to create new session for continuation"))
+				// Clear continuation tracking
+				a.continuationTaskID = ""
+				a.continuationPrompt = ""
+				return a, tea.Batch(cmds...)
+			}
+
+			// Switch to the new session
+			a.app.Session = session
+			a.app.Messages = []opencode.Message{}
+			cmds = append(cmds, util.CmdHandler(app.SessionSelectedMsg(session)))
+			cmds = append(cmds, util.CmdHandler(app.SessionClearedMsg{}))
+
+			// Calculate prompt stats
+			lines := strings.Count(a.continuationPrompt, "\n") + 1
+			words := len(strings.Fields(a.continuationPrompt))
+
+			// Show success toast with statistics
+			successMsg := fmt.Sprintf("New session created! Continuing work... (%d lines, %d words)",
+				lines, words)
+
+			cmds = append(cmds, toast.NewSuccessToast(
+				successMsg,
+				toast.WithTitle("✅ Handoff Ready"),
+				toast.WithDuration(5*time.Second),
+			))
+
+			// Send the continuation prompt as the first message in the new session
+			cmds = append(cmds, a.app.SendChatMessage(context.Background(), a.continuationPrompt, []app.Attachment{}))
+
+			// Clear continuation tracking
+			a.continuationTaskID = ""
+			a.continuationPrompt = ""
+			a.pendingContinuationCompletion = nil
+			return a, tea.Batch(cmds...)
+		}
+
+		// Only process other tasks if they belong to current session
+		if a.app.Session != nil && msg.SessionID != "" && msg.SessionID != a.app.Session.ID {
+			return a, nil // Ignore events from other sessions
+		}
+		// Task completed - set progress to 100
+		chat.UpdateTaskProgress(msg.TaskID, 100)
 		// Show completion notification with statistics
 		completionMsg := "Task completed successfully"
 		if msg.Summary != "" {
@@ -571,6 +709,10 @@ func (a appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			))
 		}
 	case app.TaskFailedMsg:
+		// Only process if this task belongs to current session
+		if a.app.Session != nil && msg.SessionID != "" && msg.SessionID != a.app.Session.ID {
+			return a, nil // Ignore events from other sessions
+		}
 		// Task failed - show error toast
 		errorMsg := fmt.Sprintf("Task failed: %s", msg.Error)
 		if msg.Recoverable {
@@ -599,8 +741,17 @@ func (a appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		// Update status component with connection info
 		a.status.SetConnectionStatus(msg.Status, msg.IsHealthy)
-	case ContinuationPromptProgressMsg:
-		// Update the existing toast with progress
+	case mcp.MCPCallStartedMsg:
+		// Handle MCP call started
+		a.mcpPanel.AddCall(msg.Call)
+	case mcp.MCPCallCompletedMsg:
+		// Handle MCP call completed
+		status := mcp.MCPCallCompleted
+		if msg.Error != "" {
+			status = mcp.MCPCallFailed
+		}
+		a.mcpPanel.UpdateCall(msg.ID, status, msg.Duration, msg.Response, msg.Error)
+	case ContinuationPromptProgressMsg: // Update the existing toast with progress
 		// Extract session ID from taskID format: "continuation-{sessionID}-{timestamp}"
 		parts := strings.Split(msg.TaskID, "-")
 		sessionID := ""
@@ -618,43 +769,99 @@ func (a appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case ContinuationPromptCompletedMsg:
 		// Handle completion of continuation prompt generation
 		if msg.Error != nil {
-			slog.Error("Continuation prompt generation failed", "error", msg.Error)
+			slog.Error("[CONTINUATION DEBUG] Generation failed",
+				"error", msg.Error,
+				"taskID", msg.TaskID)
 			cmds = append(cmds, toast.NewErrorToast(
 				fmt.Sprintf("Failed to generate prompt: %v", msg.Error),
 				toast.WithTitle("❌ Generation Failed"),
 				toast.WithDuration(7*time.Second),
 			))
+			// Clear continuation task tracking on error
+			a.continuationTaskID = ""
+			a.continuationPrompt = ""
 		} else {
-			// Create a new session for the continuation
-			session, err := a.app.CreateSession(context.Background())
-			if err != nil {
-				slog.Error("Failed to create new session", "error", err)
-				cmds = append(cmds, toast.NewErrorToast("Failed to create new session for continuation"))
-				return a, tea.Batch(cmds...)
+			// Store the continuation task ID and prompt
+			// We'll wait for the TaskCompletedMsg before creating new session
+			a.continuationTaskID = msg.TaskID
+			a.continuationPrompt = msg.Prompt
+
+			// DEBUG: Log stored values
+			slog.Info("[CONTINUATION DEBUG] Prompt completed, waiting for task",
+				"taskID", msg.TaskID,
+				"storedTaskID", a.continuationTaskID,
+				"promptLength", len(msg.Prompt),
+				"duration", msg.Duration,
+				"hasPendingCompletion", a.pendingContinuationCompletion != nil)
+
+			// Check if we already received the task completion event
+			if a.pendingContinuationCompletion != nil && a.pendingContinuationCompletion.TaskID == msg.TaskID {
+				slog.Info("[CONTINUATION DEBUG] Found pending completion event, processing immediately",
+					"taskID", msg.TaskID)
+
+				// Process the pending completion immediately
+				pendingMsg := *a.pendingContinuationCompletion
+				a.pendingContinuationCompletion = nil
+
+				// Trigger the completion handling by sending the message again
+				cmds = append(cmds, func() tea.Msg { return pendingMsg })
+			} else {
+				// Show progress toast
+				cmds = append(cmds, toast.NewInfoToast(
+					"Prompt generated, waiting for task completion...",
+					toast.WithTitle("📝 Processing"),
+					toast.WithDuration(5*time.Second),
+				))
+
+				// Add a timeout fallback - if no TaskCompletedMsg within 30 seconds
+				cmds = append(cmds, tea.Tick(30*time.Second, func(t time.Time) tea.Msg {
+					return struct{ TimeoutForTaskID string }{TimeoutForTaskID: msg.TaskID}
+				}))
 			}
-			
-			// Switch to the new session
-			a.app.Session = session
-			a.app.Messages = []opencode.Message{}
-			cmds = append(cmds, util.CmdHandler(app.SessionSelectedMsg(session)))
-			cmds = append(cmds, util.CmdHandler(app.SessionClearedMsg{}))
-			
-			// Calculate prompt stats
-			lines := strings.Count(msg.Prompt, "\n") + 1
-			words := len(strings.Fields(msg.Prompt))
-			
-			// Show success toast with statistics
-			successMsg := fmt.Sprintf("New session created! Continuing work... (%d lines, %d words)", 
-				lines, words)
-			
-			cmds = append(cmds, toast.NewSuccessToast(
-				successMsg,
-				toast.WithTitle("✅ Handoff Ready"),
-				toast.WithDuration(5*time.Second),
-			))
-			
-			// Send the continuation prompt as the first message in the new session
-			cmds = append(cmds, a.app.SendChatMessage(context.Background(), msg.Prompt, []app.Attachment{}))
+		}
+	case struct{ TimeoutForTaskID string }:
+		// Handle timeout for continuation prompt task
+		if a.continuationTaskID == msg.TimeoutForTaskID && a.continuationTaskID != "" {
+			// DEBUG: Log timeout
+			slog.Warn("[CONTINUATION DEBUG] Timeout waiting for TaskCompletedMsg",
+				"taskID", msg.TimeoutForTaskID,
+				"continuationTaskID", a.continuationTaskID,
+				"hasPrompt", len(a.continuationPrompt) > 0)
+
+			// We have the prompt but didn't get task completion
+			// Create the session anyway
+			if a.continuationPrompt != "" {
+				// Create a new session for the continuation
+				session, err := a.app.CreateSession(context.Background())
+				if err != nil {
+					slog.Error("[CONTINUATION DEBUG] Failed to create new session after timeout", "error", err)
+					cmds = append(cmds, toast.NewErrorToast("Failed to create new session for continuation"))
+					// Clear continuation tracking
+					a.continuationTaskID = ""
+					a.continuationPrompt = ""
+					return a, tea.Batch(cmds...)
+				}
+
+				// Switch to the new session
+				a.app.Session = session
+				a.app.Messages = []opencode.Message{}
+				cmds = append(cmds, util.CmdHandler(app.SessionSelectedMsg(session)))
+				cmds = append(cmds, util.CmdHandler(app.SessionClearedMsg{}))
+
+				// Show warning toast about timeout
+				cmds = append(cmds, toast.NewWarningToast(
+					"Created session after timeout - task completion not received",
+					toast.WithTitle("⚠️ Timeout Recovery"),
+					toast.WithDuration(5*time.Second),
+				))
+
+				// Send the continuation prompt as the first message in the new session
+				cmds = append(cmds, a.app.SendChatMessage(context.Background(), a.continuationPrompt, []app.Attachment{}))
+
+				// Clear continuation tracking
+				a.continuationTaskID = ""
+				a.continuationPrompt = ""
+			}
 		}
 	}
 
@@ -671,6 +878,11 @@ func (a appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	// update messages
 	u, cmd = a.messages.Update(msg)
 	a.messages = u.(chat.MessagesComponent)
+	cmds = append(cmds, cmd)
+
+	// update MCP panel
+	u, cmd = a.mcpPanel.Update(msg)
+	a.mcpPanel = u.(mcp.MCPPanelComponent)
 	cmds = append(cmds, cmd)
 
 	// update modal
@@ -718,20 +930,36 @@ func (a appModel) chat(width int, align lipgloss.Position) string {
 		styles.WhitespaceStyle(t.Background()),
 	)
 
+	// Build layout items
+	layoutItems := []layout.FlexItem{
+		{
+			View: messagesView,
+			Grow: true,
+		},
+	}
+
+	// Add MCP panel if visible
+	if a.showMCPPanel && a.mcpPanel.IsVisible() {
+		mcpPanelView := a.mcpPanel.View()
+		layoutItems = append(layoutItems, layout.FlexItem{
+			View:      mcpPanelView,
+			FixedSize: 6,
+		})
+	}
+
+	// Add editor at the bottom
+	layoutItems = append(layoutItems, layout.FlexItem{
+		View:      centeredEditorView,
+		FixedSize: 5,
+	})
+
 	mainLayout := layout.Render(
 		layout.FlexOptions{
 			Direction: layout.Column,
 			Width:     a.width,
 			Height:    a.height,
 		},
-		layout.FlexItem{
-			View: messagesView,
-			Grow: true,
-		},
-		layout.FlexItem{
-			View:      centeredEditorView,
-			FixedSize: 5,
-		},
+		layoutItems...,
 	)
 
 	if lines > 1 {
@@ -950,6 +1178,11 @@ func (a appModel) executeCommand(command commands.Command) (tea.Model, tea.Cmd) 
 			return a, toast.NewErrorToast("No active session to generate continuation prompt")
 		}
 
+		// DEBUG: Log command triggered
+		slog.Info("[CONTINUATION DEBUG] Command triggered",
+			"sessionID", a.app.Session.ID,
+			"timestamp", time.Now().Format(time.RFC3339Nano))
+
 		// Step 1: Show immediate feedback that command was triggered
 		// Show initial toast with longer duration and a specific ID
 		toastID := fmt.Sprintf("continuation-toast-%s", a.app.Session.ID)
@@ -968,7 +1201,7 @@ func (a appModel) executeCommand(command commands.Command) (tea.Model, tea.Cmd) 
 				slog.Error("DGMO_SERVER environment variable not set")
 				return toast.NewErrorToast("Server URL not configured")
 			}
-			
+
 			// Start time for duration tracking
 			startTime := time.Now()
 
@@ -1006,7 +1239,8 @@ func (a appModel) executeCommand(command commands.Command) (tea.Model, tea.Cmd) 
 			}
 
 			var response struct {
-				Prompt string `json:"prompt"`
+				Prompt string      `json:"prompt"`
+				TaskID interface{} `json:"taskId,omitempty"` // Server might include task ID
 			}
 			if err := json.NewDecoder(resp.Body).Decode(&response); err != nil {
 				slog.Error("Failed to decode continuation prompt response", "error", err)
@@ -1017,9 +1251,31 @@ func (a appModel) executeCommand(command commands.Command) (tea.Model, tea.Cmd) 
 				}
 			}
 
-			// Step 3: Send completion message
+			// Extract task ID from response if available
+			taskID := fmt.Sprintf("continuation-%s-%d", a.app.Session.ID, startTime.UnixMilli())
+			if respTaskID, ok := response.TaskID.(string); ok && respTaskID != "" {
+				taskID = respTaskID
+			}
+
+			// DEBUG: Log response details
+			slog.Info("[CONTINUATION DEBUG] Server response received",
+				"taskID", taskID,
+				"serverTaskID", response.TaskID,
+				"promptLength", len(response.Prompt),
+				"sessionID", a.app.Session.ID)
+
+			// Also log WebSocket connection status
+			if a.app.TaskClient != nil {
+				stats := a.app.TaskClient.GetConnectionStats()
+				slog.Info("[CONTINUATION DEBUG] WebSocket status at response time",
+					"state", stats["state"],
+					"isHealthy", stats["is_healthy"],
+					"retryCount", stats["retry_count"])
+			}
+
+			// Step 3: Store the prompt and task ID, wait for task completion
 			return ContinuationPromptCompletedMsg{
-				TaskID:   a.app.Session.ID,
+				TaskID:   taskID,
 				Prompt:   response.Prompt,
 				Duration: time.Since(startTime),
 				Error:    nil,
@@ -1082,8 +1338,20 @@ func (a appModel) executeCommand(command commands.Command) (tea.Model, tea.Cmd) 
 		updated, cmd := a.messages.HalfPageDown()
 		a.messages = updated.(chat.MessagesComponent)
 		cmds = append(cmds, cmd)
+	case commands.DynamicSizingToggleCommand:
+		// Toggle dynamic sizing (placeholder for now - would need dynamic TUI integration)
+		return a, toast.NewInfoToast("Dynamic sizing toggle - feature coming soon!")
+	case commands.DynamicSizingPresetCommand:
+		// Change sizing preset (placeholder for now - would need dynamic TUI integration)
+		return a, toast.NewInfoToast("Sizing preset change - feature coming soon!")
 	case commands.AppExitCommand:
 		return a, tea.Quit
+	case commands.RevertCheckpointCommand:
+		if a.app.Session == nil || a.app.Session.ID == "" {
+			return a, toast.NewErrorToast("No active session to revert")
+		}
+		revertDialog := dialog.NewRevertDialog(a.app)
+		a.modal = revertDialog
 	}
 	return a, tea.Batch(cmds...)
 }
@@ -1103,6 +1371,7 @@ func NewModel(app *app.App) tea.Model {
 
 	messages := chat.NewMessagesComponent(app)
 	editor := chat.NewEditorComponent(app)
+	mcpPanel := mcp.NewMCPPanelComponent(app)
 	completions := dialog.NewCompletionDialogComponent(initialProvider)
 
 	var leaderBinding *key.Binding
@@ -1112,18 +1381,23 @@ func NewModel(app *app.App) tea.Model {
 	}
 
 	model := &appModel{
-		status:               status.NewStatusCmp(app),
-		app:                  app,
-		editor:               editor,
-		messages:             messages,
+		status:   status.NewStatusCmp(app),
+		app:      app,
+		editor:   editor,
+		messages: messages,
+		mcpPanel: mcpPanel,
+
 		completions:          completions,
 		completionManager:    completionManager,
 		leaderBinding:        leaderBinding,
 		isLeaderSequence:     false,
 		showCompletionDialog: false,
-		toastManager:         toast.NewToastManager(),
-		interruptKeyState:    InterruptKeyIdle,
-		isAltScreen:          false, // Start with alt screen disabled (normal terminal mode)
+		showMCPPanel:         false, // Start with MCP panel hidden
+
+		toastManager:      toast.NewToastManager(),
+		interruptKeyState: InterruptKeyIdle,
+		isAltScreen:       false, // Start with alt screen disabled (normal terminal mode)
+
 	}
 
 	return model

@@ -89,26 +89,37 @@ func main() {
 			slog.Info("TUI received task started event", "taskID", task.ID, "description", task.Description)
 			program.Send(app.TaskStartedMsg{Task: task})
 		},
-		OnTaskProgress: func(taskID string, progress int, message string) {
-			slog.Info("TUI received task progress event", "taskID", taskID, "progress", progress, "message", message)
+		OnTaskProgress: func(sessionID, taskID string, progress int, message string, phase string, currentTool string) {
+			slog.Info("TUI received task progress event", 
+				"sessionID", sessionID, 
+				"taskID", taskID, 
+				"progress", progress, 
+				"message", message,
+				"phase", phase,
+				"currentTool", currentTool)
 			program.Send(app.TaskProgressMsg{
-				TaskID:   taskID,
-				Progress: progress,
-				Message:  message,
+				SessionID:   sessionID,
+				TaskID:      taskID,
+				Progress:    progress,
+				Message:     message,
+				Phase:       phase,
+				CurrentTool: currentTool,
 			})
 		},
-		OnTaskCompleted: func(taskID string, duration time.Duration, success bool, summary string) {
-			slog.Info("TUI received task completed event", "taskID", taskID, "success", success, "duration", duration)
+		OnTaskCompleted: func(sessionID, taskID string, duration time.Duration, success bool, summary string) {
+			slog.Info("TUI received task completed event", "sessionID", sessionID, "taskID", taskID, "success", success, "duration", duration)
 			program.Send(app.TaskCompletedMsg{
-				TaskID:   taskID,
-				Duration: duration,
-				Success:  success,
-				Summary:  summary,
+				SessionID: sessionID,
+				TaskID:    taskID,
+				Duration:  duration,
+				Success:   success,
+				Summary:   summary,
 			})
 		},
-		OnTaskFailed: func(taskID string, error string, recoverable bool) {
-			slog.Info("TUI received task failed event", "taskID", taskID, "error", error, "recoverable", recoverable)
+		OnTaskFailed: func(sessionID, taskID string, error string, recoverable bool) {
+			slog.Info("TUI received task failed event", "sessionID", sessionID, "taskID", taskID, "error", error, "recoverable", recoverable)
 			program.Send(app.TaskFailedMsg{
+				SessionID:   sessionID,
 				TaskID:      taskID,
 				Error:       error,
 				Recoverable: recoverable,

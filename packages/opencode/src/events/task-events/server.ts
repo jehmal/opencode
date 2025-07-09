@@ -7,6 +7,12 @@ import {
   TaskCompletedEvent,
   TaskFailedEvent,
 } from "../task-events"
+import {
+  MCPCallStartedEvent,
+  MCPCallProgressEvent,
+  MCPCallCompletedEvent,
+  MCPCallFailedEvent,
+} from "../mcp-events"
 import { connectionHealthMonitor } from "../connection-status"
 
 const log = Log.create({ service: "task-events-server" })
@@ -75,7 +81,7 @@ export class TaskEventServer {
         {
           sessionID: event.properties.sessionID,
           message: event.properties.message,
-        }
+        },
       )
       this.broadcast({
         type: "task.progress",
@@ -106,20 +112,64 @@ export class TaskEventServer {
       })
     })
 
+    // Subscribe to MCP events
+    Bus.subscribe(MCPCallStartedEvent, (event) => {
+      log.info(`MCP call started: ${event.properties.id}`, {
+        server: event.properties.server,
+        method: event.properties.method,
+        sessionID: event.properties.sessionID,
+      })
+      this.broadcast({
+        type: "mcp.call.started",
+        data: event.properties,
+      })
+    })
+
+    Bus.subscribe(MCPCallProgressEvent, (event) => {
+      log.info(`MCP call progress: ${event.properties.id}`, {
+        message: event.properties.message,
+      })
+      this.broadcast({
+        type: "mcp.call.progress",
+        data: event.properties,
+      })
+    })
+
+    Bus.subscribe(MCPCallCompletedEvent, (event) => {
+      log.info(`MCP call completed: ${event.properties.id}`, {
+        duration: event.properties.duration,
+      })
+      this.broadcast({
+        type: "mcp.call.completed",
+        data: event.properties,
+      })
+    })
+
+    Bus.subscribe(MCPCallFailedEvent, (event) => {
+      log.info(`MCP call failed: ${event.properties.id}`, {
+        error: event.properties.error,
+        duration: event.properties.duration,
+      })
+      this.broadcast({
+        type: "mcp.call.failed",
+        data: event.properties,
+      })
+    })
+
     log.info(`Task event server started on port ${this.port}`)
   }
 
   private broadcast(message: any) {
     const data = JSON.stringify(message)
     const activeClients = Array.from(this.clients).filter(
-      (client) => client.readyState === client.OPEN
+      (client) => client.readyState === client.OPEN,
     )
-    
+
     log.info(`Broadcasting to ${activeClients.length} active clients`, {
       type: message.type,
       totalClients: this.clients.size,
     })
-    
+
     activeClients.forEach((client) => {
       try {
         client.send(data)

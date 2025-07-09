@@ -8,6 +8,7 @@ import (
 	"math"
 	"math/rand"
 	"net"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -83,14 +84,17 @@ type TaskClient struct {
 	eventQueue    []TaskEvent
 	queueMu       sync.Mutex
 	statusHandler func(ConnectionState, error)
+	// Agent counting per session
+	sessionAgentCounters map[string]int32 // sessionID -> next agent number
+	agentCounterMu       sync.RWMutex
 }
 
 // TaskEventHandlers contains callbacks for task events
 type TaskEventHandlers struct {
 	OnTaskStarted   func(TaskInfo)
-	OnTaskProgress  func(taskID string, progress int, message string)
-	OnTaskCompleted func(taskID string, duration time.Duration, success bool, summary string)
-	OnTaskFailed    func(taskID string, error string, recoverable bool)
+	OnTaskProgress  func(sessionID, taskID string, progress int, message string, phase string, currentTool string)
+	OnTaskCompleted func(sessionID, taskID string, duration time.Duration, success bool, summary string)
+	OnTaskFailed    func(sessionID, taskID string, error string, recoverable bool)
 }
 
 // TaskEvent represents a WebSocket task event
@@ -110,12 +114,15 @@ type TaskStartedData struct {
 
 // TaskProgressData represents task.progress event data
 type TaskProgressData struct {
-	SessionID string `json:"sessionID"`
-	TaskID    string `json:"taskID"`
-	Progress  int    `json:"progress"`
-	Message   string `json:"message,omitempty"`
-	Timestamp int64  `json:"timestamp"`
-	StartTime int64  `json:"startTime,omitempty"`
+	SessionID       string `json:"sessionID"`
+	TaskID          string `json:"taskID"`
+	Progress        int    `json:"progress"`
+	Message         string `json:"message,omitempty"`
+	Timestamp       int64  `json:"timestamp"`
+	StartTime       int64  `json:"startTime,omitempty"`
+	Phase           string `json:"phase,omitempty"`
+	CurrentTool     string `json:"currentTool,omitempty"`
+	ToolDescription string `json:"toolDescription,omitempty"`
 }
 
 // TaskCompletedData represents task.completed event data
@@ -141,15 +148,16 @@ type TaskFailedData struct {
 func NewTaskClient(handlers TaskEventHandlers) *TaskClient {
 	ctx, cancel := context.WithCancel(context.Background())
 	return &TaskClient{
-		url:         "ws://localhost:5747",
-		tasks:       make(map[string]*TaskInfo),
-		handlers:    handlers,
-		reconnect:   true,
-		ctx:         ctx,
-		cancel:      cancel,
-		state:       int32(StateDisconnected),
-		retryConfig: DefaultRetryConfig(),
-		eventQueue:  make([]TaskEvent, 0),
+		url:                  "ws://localhost:5747",
+		tasks:                make(map[string]*TaskInfo),
+		handlers:             handlers,
+		reconnect:            true,
+		ctx:                  ctx,
+		cancel:               cancel,
+		state:                int32(StateDisconnected),
+		retryConfig:          DefaultRetryConfig(),
+		eventQueue:           make([]TaskEvent, 0),
+		sessionAgentCounters: make(map[string]int32),
 	}
 }
 
@@ -183,7 +191,7 @@ func (tc *TaskClient) setState(newState ConnectionState, err error) {
 func (tc *TaskClient) isServerReady() bool {
 	// Try both IPv4 and IPv6 connections
 	addresses := []string{"127.0.0.1:5747", "[::1]:5747", "localhost:5747"}
-	
+
 	var lastErr error
 	for _, addr := range addresses {
 		client := &net.Dialer{Timeout: 2 * time.Second}
@@ -197,7 +205,7 @@ func (tc *TaskClient) isServerReady() bool {
 		slog.Debug("TCP connection successful", "address", addr)
 		return true
 	}
-	
+
 	slog.Debug("All TCP connection attempts failed", "last_error", lastErr)
 	return false
 }
@@ -234,7 +242,7 @@ func (tc *TaskClient) ConnectWithRetry(enableRetry bool) error {
 	tc.mu.RLock()
 	isConnected := tc.conn != nil && tc.GetConnectionState() == StateConnected
 	tc.mu.RUnlock()
-	
+
 	if isConnected {
 		return nil // Already connected
 	}
@@ -255,7 +263,7 @@ func (tc *TaskClient) ConnectWithRetry(enableRetry bool) error {
 			}
 			time.Sleep(1 * time.Second)
 		}
-		
+
 		// Final check before attempting connection
 		if !tc.isServerReady() {
 			slog.Warn("Server not ready after 60 seconds, attempting connection anyway")
@@ -307,7 +315,7 @@ func (tc *TaskClient) ConnectWithRetry(enableRetry bool) error {
 		tc.mu.Lock()
 		tc.conn = conn
 		tc.mu.Unlock()
-		
+
 		atomic.StoreInt32(&tc.retryCount, 0)
 		tc.setState(StateConnected, nil)
 		tc.updateHeartbeat()
@@ -422,6 +430,23 @@ func (tc *TaskClient) GetTask(taskID string) (*TaskInfo, bool) {
 	return task, ok
 }
 
+// getNextAgentNumber returns the next agent number for a session
+func (tc *TaskClient) getNextAgentNumber(sessionID string) int32 {
+	tc.agentCounterMu.Lock()
+	defer tc.agentCounterMu.Unlock()
+
+	// Increment and return the next agent number for this session
+	tc.sessionAgentCounters[sessionID]++
+	return tc.sessionAgentCounters[sessionID]
+}
+
+// resetAgentCounter resets the agent counter for a session
+func (tc *TaskClient) resetAgentCounter(sessionID string) {
+	tc.agentCounterMu.Lock()
+	defer tc.agentCounterMu.Unlock()
+	tc.sessionAgentCounters[sessionID] = 0
+}
+
 // readLoop handles incoming WebSocket messages with enhanced error handling
 func (tc *TaskClient) readLoop() {
 	defer func() {
@@ -519,6 +544,11 @@ func (tc *TaskClient) queueEvent(event TaskEvent) {
 
 // handleEvent processes incoming task events
 func (tc *TaskClient) handleEvent(event TaskEvent) {
+	// DEBUG: Log all incoming events
+	slog.Debug("[TASK_CLIENT] Received event",
+		"type", event.Type,
+		"dataLength", len(event.Data))
+
 	switch event.Type {
 	case "task.started":
 		var data TaskStartedData
@@ -526,6 +556,15 @@ func (tc *TaskClient) handleEvent(event TaskEvent) {
 			slog.Error("Failed to unmarshal task.started event", "error", err)
 			return
 		}
+
+		// DEBUG: Log task.started details
+		slog.Info("[TASK_CLIENT] task.started event",
+			"taskID", data.TaskID,
+			"sessionID", data.SessionID,
+			"isContinuation", strings.HasPrefix(data.TaskID, "continuation-"))
+
+		// Get the next agent number for this session
+		agentNumber := tc.getNextAgentNumber(data.SessionID)
 
 		task := TaskInfo{
 			ID:          data.TaskID,
@@ -535,6 +574,7 @@ func (tc *TaskClient) handleEvent(event TaskEvent) {
 			Status:      TaskStatusRunning,
 			Progress:    0,
 			StartTime:   time.Unix(0, data.Timestamp*int64(time.Millisecond)),
+			AgentNumber: agentNumber,
 		}
 
 		tc.mu.Lock()
@@ -563,7 +603,7 @@ func (tc *TaskClient) handleEvent(event TaskEvent) {
 		tc.mu.Unlock()
 
 		if tc.handlers.OnTaskProgress != nil {
-			tc.handlers.OnTaskProgress(data.TaskID, data.Progress, data.Message)
+			tc.handlers.OnTaskProgress(data.SessionID, data.TaskID, data.Progress, data.Message, data.Phase, data.CurrentTool)
 		}
 
 	case "task.completed":
@@ -572,6 +612,14 @@ func (tc *TaskClient) handleEvent(event TaskEvent) {
 			slog.Error("Failed to unmarshal task.completed event", "error", err)
 			return
 		}
+
+		// DEBUG: Log task.completed details
+		slog.Info("[TASK_CLIENT] task.completed event",
+			"taskID", data.TaskID,
+			"sessionID", data.SessionID,
+			"isContinuation", strings.HasPrefix(data.TaskID, "continuation-"),
+			"success", data.Success,
+			"duration", data.Duration)
 
 		tc.mu.Lock()
 		if task, ok := tc.tasks[data.TaskID]; ok {
@@ -582,7 +630,7 @@ func (tc *TaskClient) handleEvent(event TaskEvent) {
 		tc.mu.Unlock()
 
 		if tc.handlers.OnTaskCompleted != nil {
-			tc.handlers.OnTaskCompleted(data.TaskID, time.Duration(data.Duration)*time.Millisecond, data.Success, data.Summary)
+			tc.handlers.OnTaskCompleted(data.SessionID, data.TaskID, time.Duration(data.Duration)*time.Millisecond, data.Success, data.Summary)
 		}
 
 		// Clean up completed task after a delay
@@ -608,7 +656,7 @@ func (tc *TaskClient) handleEvent(event TaskEvent) {
 		tc.mu.Unlock()
 
 		if tc.handlers.OnTaskFailed != nil {
-			tc.handlers.OnTaskFailed(data.TaskID, data.Error, data.Recoverable)
+			tc.handlers.OnTaskFailed(data.SessionID, data.TaskID, data.Error, data.Recoverable)
 		}
 
 		// Clean up failed task after a delay

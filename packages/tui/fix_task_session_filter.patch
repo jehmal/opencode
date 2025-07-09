@@ -1,0 +1,47 @@
+# Fix for Task Event Session Filtering
+
+This patch adds session filtering to task events so that only events from the current session are displayed.
+
+## Changes needed:
+
+1. **Update TaskProgressMsg to include SessionID**
+   In `/internal/app/tasks.go`, modify:
+   ```go
+   type TaskProgressMsg struct {
+       SessionID string  // Add this field
+       TaskID   string
+       Progress int
+       Message  string
+   }
+   ```
+
+2. **Update other task messages similarly**:
+   - TaskCompletedMsg - add SessionID field
+   - TaskFailedMsg - add SessionID field
+
+3. **Update TaskClient to pass SessionID in handlers**
+   The handlers need to be updated to include session ID:
+   ```go
+   OnTaskProgress func(sessionID, taskID string, progress int, message string)
+   OnTaskCompleted func(sessionID, taskID string, duration time.Duration, success bool, summary string)
+   OnTaskFailed func(sessionID, taskID string, error string, recoverable bool)
+   ```
+
+4. **Add session filtering in TUI message handlers**
+   In `/internal/tui/tui.go`, add filtering:
+   ```go
+   case app.TaskProgressMsg:
+       // Only process if this task belongs to current session
+       if a.app.Session != nil && msg.SessionID != a.app.Session.ID {
+           return a, nil // Ignore events from other sessions
+       }
+       // ... rest of handler
+   ```
+
+## Root Cause
+When `/continue` creates a new session, the WebSocket continues receiving events from tasks in the old session. Without session filtering, these events appear in the new session.
+
+## Testing
+1. Start a long-running task in session A
+2. Run `/continue` to create session B
+3. Verify that task progress from session A doesn't appear in session B

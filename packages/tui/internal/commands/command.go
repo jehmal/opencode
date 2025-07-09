@@ -75,6 +75,7 @@ const (
 	SessionNewCommand           CommandName = "session_new"
 	SessionListCommand          CommandName = "session_list"
 	SessionShareCommand         CommandName = "session_share"
+	SessionRevertCommand        CommandName = "session_revert"
 	SessionInterruptCommand     CommandName = "session_interrupt"
 	SessionCompactCommand       CommandName = "session_compact"
 	ToolDetailsCommand          CommandName = "tool_details"
@@ -99,6 +100,8 @@ const (
 	MessagesFirstCommand        CommandName = "messages_first"
 	MessagesLastCommand         CommandName = "messages_last"
 	AppExitCommand              CommandName = "app_exit"
+	DynamicSizingToggleCommand  CommandName = "dynamic_sizing_toggle"
+	DynamicSizingPresetCommand  CommandName = "dynamic_sizing_preset"
 )
 
 func (k Command) Matches(msg tea.KeyPressMsg, leader bool) bool {
@@ -285,6 +288,18 @@ func LoadFromConfig(config *opencode.Config) CommandRegistry {
 			Description: "exit the app",
 			Keybindings: parseBindings("ctrl+c", "<leader>q"),
 			Trigger:     "exit",
+		},
+		{
+			Name:        DynamicSizingToggleCommand,
+			Description: "toggle dynamic panel sizing",
+			Keybindings: parseBindings("<leader>r"),
+			Trigger:     "resize",
+		},
+		{
+			Name:        DynamicSizingPresetCommand,
+			Description: "change sizing preset",
+			Keybindings: parseBindings("<leader>p"),
+			Trigger:     "preset",
 		},
 	}
 	registry := make(CommandRegistry)

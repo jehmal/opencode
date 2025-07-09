@@ -1,5 +1,5 @@
-import { Bus } from "../bus"
-import { Log } from "../util/log"
+import { Bus } from "../../bus"
+import { Log } from "../../util/log"
 import {
   TaskStartedEvent,
   TaskProgressEvent,
@@ -8,8 +8,7 @@ import {
   emitTaskStarted,
   emitTaskProgress,
   emitTaskCompleted,
-} from "./task-events"
-
+} from "../task-events"
 const log = Log.create({ service: "task-events-diagnostics" })
 
 export class TaskEventDiagnostics {
@@ -82,7 +81,7 @@ export class TaskEventDiagnostics {
   // Test event emission
   async testEventFlow(sessionID: string = "test-session") {
     log.info("🧪 Starting event flow test")
-    
+
     const taskID = `test-${Date.now()}`
     const startTime = Date.now()
 
@@ -95,7 +94,7 @@ export class TaskEventDiagnostics {
       timestamp: startTime,
     })
 
-    await new Promise(resolve => setTimeout(resolve, 100))
+    await new Promise((resolve) => setTimeout(resolve, 100))
 
     emitTaskProgress({
       sessionID,
@@ -106,7 +105,7 @@ export class TaskEventDiagnostics {
       startTime,
     })
 
-    await new Promise(resolve => setTimeout(resolve, 100))
+    await new Promise((resolve) => setTimeout(resolve, 100))
 
     emitTaskProgress({
       sessionID,
@@ -117,7 +116,7 @@ export class TaskEventDiagnostics {
       startTime,
     })
 
-    await new Promise(resolve => setTimeout(resolve, 100))
+    await new Promise((resolve) => setTimeout(resolve, 100))
 
     emitTaskCompleted({
       sessionID,

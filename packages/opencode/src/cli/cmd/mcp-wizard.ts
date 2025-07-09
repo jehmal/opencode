@@ -466,7 +466,9 @@ async function modifyConfiguration(
     })
 
     if (prompts.isCancel(commandStr)) return null
-    newConfig.command = commandStr.trim().split(/\s+/)
+    if (newConfig.type === "local") {
+      newConfig.command = commandStr.trim().split(/\\s+/)
+    }
   }
 
   if (whatToModify === "environment" && config.type === "local") {
@@ -494,7 +496,9 @@ async function modifyConfiguration(
         }
       }
     }
-    newConfig.environment = environment
+    if (newConfig.type === "local") {
+      newConfig.environment = environment
+    }
   }
 
   if (whatToModify === "url" && config.type === "remote") {
@@ -513,7 +517,9 @@ async function modifyConfiguration(
     })
 
     if (prompts.isCancel(url)) return null
-    newConfig.url = url
+    if (newConfig.type === "remote") {
+      newConfig.url = url
+    }
   }
 
   return newConfig

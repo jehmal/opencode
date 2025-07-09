@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/url"
+	"strings"
 	"sync"
 	"time"
 
@@ -21,27 +22,32 @@ type TaskEvent struct {
 // TaskEventHandler is a function that handles task events
 type TaskEventHandler func(event TaskEvent)
 
+// MCPEventHandler is a function that handles MCP events
+type MCPEventHandler func(eventType string, data MCPEventData)
+
 // TaskClient manages the WebSocket connection for task events
 type TaskClient struct {
-	url       string
-	conn      *websocket.Conn
-	mu        sync.Mutex
-	handlers  []TaskEventHandler
-	ctx       context.Context
-	cancel    context.CancelFunc
-	reconnect bool
-	connected bool
+	url         string
+	conn        *websocket.Conn
+	mu          sync.Mutex
+	handlers    []TaskEventHandler
+	mcpHandlers []MCPEventHandler
+	ctx         context.Context
+	cancel      context.CancelFunc
+	reconnect   bool
+	connected   bool
 }
 
 // NewTaskClient creates a new task event client
 func NewTaskClient(wsURL string) *TaskClient {
 	ctx, cancel := context.WithCancel(context.Background())
 	return &TaskClient{
-		url:       wsURL,
-		handlers:  make([]TaskEventHandler, 0),
-		ctx:       ctx,
-		cancel:    cancel,
-		reconnect: true,
+		url:         wsURL,
+		handlers:    make([]TaskEventHandler, 0),
+		mcpHandlers: make([]MCPEventHandler, 0),
+		ctx:         ctx,
+		cancel:      cancel,
+		reconnect:   true,
 	}
 }
 
@@ -50,6 +56,13 @@ func (c *TaskClient) AddHandler(handler TaskEventHandler) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.handlers = append(c.handlers, handler)
+}
+
+// AddMCPHandler adds an MCP event handler
+func (c *TaskClient) AddMCPHandler(handler MCPEventHandler) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.mcpHandlers = append(c.mcpHandlers, handler)
 }
 
 // Connect establishes the WebSocket connection
@@ -126,7 +139,13 @@ func (c *TaskClient) readLoop() {
 				continue
 			}
 
-			// Notify all handlers
+			// Handle MCP events
+			if strings.HasPrefix(event.Type, "mcp.") {
+				c.handleMCPEvent(event)
+				continue
+			}
+
+			// Notify all task event handlers
 			c.mu.Lock()
 			handlers := make([]TaskEventHandler, len(c.handlers))
 			copy(handlers, c.handlers)
@@ -159,4 +178,27 @@ func (c *TaskClient) IsConnected() bool {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	return c.connected
+}
+
+// handleMCPEvent processes MCP events and notifies MCP handlers
+func (c *TaskClient) handleMCPEvent(event TaskEvent) {
+	// Parse the MCP event data
+	var mcpData MCPEventData
+	if dataBytes, err := json.Marshal(event.Data); err != nil {
+		slog.Error("Failed to marshal MCP event data", "error", err)
+		return
+	} else if err := json.Unmarshal(dataBytes, &mcpData); err != nil {
+		slog.Error("Failed to parse MCP event data", "error", err)
+		return
+	}
+
+	// Notify all MCP handlers
+	c.mu.Lock()
+	mcpHandlers := make([]MCPEventHandler, len(c.mcpHandlers))
+	copy(mcpHandlers, c.mcpHandlers)
+	c.mu.Unlock()
+
+	for _, handler := range mcpHandlers {
+		go handler(event.Type, mcpData)
+	}
 }

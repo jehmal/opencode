@@ -2,258 +2,324 @@
  * DGM Bridge - TypeScript to Python subprocess management
  */
 
-import { spawn, ChildProcess } from 'child_process';
-import { EventEmitter } from 'events';
-import { z } from 'zod';
-import path from 'path';
-import { fileURLToPath } from 'url';
+import { spawn, ChildProcess } from "child_process"
+import { EventEmitter } from "events"
+import { z } from "zod"
+import path from "path"
+import { fileURLToPath } from "url"
 
 // Get current directory for locating Python scripts
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = path.dirname(__filename)
 
-// JSON-RPC message schema
-const JSONRPCRequestSchema = z.object({
-  jsonrpc: z.literal('2.0'),
-  method: z.string(),
-  params: z.any().optional(),
-  id: z.union([z.string(), z.number()])
-});
+// JSON-RPC message schema (keeping for potential future use)
+// const JSONRPCRequestSchema = z.object({
+//   jsonrpc: z.literal("2.0"),
+//   method: z.string(),
+//   params: z.any().optional(),
+//   id: z.union([z.string(), z.number()]),
+// })
 
 const JSONRPCResponseSchema = z.object({
-  jsonrpc: z.literal('2.0'),
+  jsonrpc: z.literal("2.0"),
   result: z.any().optional(),
-  error: z.object({
-    code: z.number(),
-    message: z.string(),
-    data: z.any().optional()
-  }).optional(),
-  id: z.union([z.string(), z.number()])
-});
+  error: z
+    .object({
+      code: z.number(),
+      message: z.string(),
+      data: z.any().optional(),
+    })
+    .optional(),
+  id: z.union([z.string(), z.number()]),
+})
 
 export interface DGMBridgeOptions {
-  pythonPath?: string;
-  scriptPath?: string;
-  maxRetries?: number;
-  timeout?: number;
+  pythonPath?: string
+  scriptPath?: string
+  maxRetries?: number
+  timeout?: number
+  anthropicToken?: string
 }
 
 export interface DGMRequest {
-  method: string;
-  params?: any;
+  method: string
+  params?: any
 }
 
 export interface DGMResponse {
-  success: boolean;
-  data?: any;
-  error?: string;
+  success: boolean
+  data?: any
+  error?: string
 }
 
 export class DGMBridge extends EventEmitter {
-  private process?: ChildProcess;
-  private pythonPath: string;
-  private scriptPath: string;
-  private messageQueue: Map<string | number, {
-    resolve: (value: DGMResponse) => void;
-    reject: (error: Error) => void;
-    timeout: NodeJS.Timeout;
-  }> = new Map();
-  private messageId = 0;
-  private buffer = '';
-  private isInitialized = false;
-  private maxRetries: number;
-  private timeout: number;
+  private process?: ChildProcess
+  private pythonPath: string
+  private scriptPath: string
+  private messageQueue: Map<
+    string | number,
+    {
+      resolve: (value: DGMResponse) => void
+      reject: (error: Error) => void
+      timeout: NodeJS.Timeout
+    }
+  > = new Map()
+  private messageId = 0
+  private buffer = ""
+  private isInitialized = false
+  private _maxRetries: number
+  private timeout: number
+  private anthropicToken?: string
 
   constructor(options: DGMBridgeOptions = {}) {
-    super();
-    // Use DGM venv Python if available
-    const dgmVenvPath = path.join(__dirname, '../../../../dgm/venv/bin/python');
-    this.pythonPath = options.pythonPath || dgmVenvPath;
-    this.scriptPath = options.scriptPath || path.join(__dirname, '..', 'python', 'bridge.py');
-    this.maxRetries = options.maxRetries || 3;
-    this.timeout = options.timeout || 30000; // 30 seconds default timeout
+    super()
+    // Use DGM venv Python if available - resolve to absolute path
+    const dgmVenvPath = path.resolve(
+      path.join(__dirname, "../../../../dgm/venv/bin/python"),
+    )
+    this.pythonPath = options.pythonPath || dgmVenvPath
+    this.scriptPath =
+      options.scriptPath ||
+      path.resolve(path.join(__dirname, "..", "python", "bridge.py"))
+    this._maxRetries = options.maxRetries || 3
+    this.timeout = options.timeout || 30000 // 30 seconds default timeout
+    this.anthropicToken = options.anthropicToken
   }
 
   async initialize(): Promise<void> {
     if (this.isInitialized) {
-      return;
+      return
     }
 
     try {
-      await this.spawnProcess();
-      this.isInitialized = true;
-      this.emit('initialized');
+      await this.spawnProcess()
+      this.isInitialized = true
+      this.emit("initialized")
     } catch (error) {
-      this.emit('error', error);
-      throw new Error(`Failed to initialize DGM bridge: ${error}`);
+      this.emit("error", error)
+      throw new Error(`Failed to initialize DGM bridge: ${error}`)
     }
   }
 
   private async spawnProcess(): Promise<void> {
     return new Promise((resolve, reject) => {
+      // Get the project root directory - use absolute paths
+      const projectRoot = path.resolve(path.join(__dirname, "../../../../"))
+      const dgmPath = path.resolve(path.join(projectRoot, "dgm"))
+      const venvPath = path.resolve(path.join(dgmPath, "venv"))
+
+      // Log for debugging
+      console.error("Python path:", this.pythonPath)
+      console.error("Script path:", this.scriptPath)
+      console.error("Project root:", projectRoot)
+      console.error("DGM path:", dgmPath)
+      console.error("Venv path:", venvPath)
+
+      // Ensure venv site-packages is in PYTHONPATH
+      const venvSitePackages = path.join(
+        venvPath,
+        "lib",
+        "python3.12",
+        "site-packages",
+      )
+      const pythonPath = [dgmPath, venvSitePackages].join(path.delimiter)
+
+      // Create environment with auth token
+      const env: any = {
+        ...process.env,
+        PYTHONUNBUFFERED: "1",
+        PYTHONPATH: pythonPath,
+        VIRTUAL_ENV: venvPath,
+      }
+
+      // Add Anthropic OAuth token if available
+      if (this.anthropicToken) {
+        env.ANTHROPIC_AUTH_TOKEN = this.anthropicToken
+      }
+
+      // Debug environment
+      console.error("Environment PYTHONPATH:", env.PYTHONPATH)
+      console.error("Environment VIRTUAL_ENV:", env.VIRTUAL_ENV)
+      console.error("Auth token present:", !!env.ANTHROPIC_AUTH_TOKEN)
+
       this.process = spawn(this.pythonPath, [this.scriptPath], {
-        stdio: ['pipe', 'pipe', 'pipe'],
-        env: { ...process.env, PYTHONUNBUFFERED: '1' }
-      });
+        stdio: ["pipe", "pipe", "pipe"],
+        env,
+        cwd: projectRoot,
+      })
 
-      this.process.stdout?.on('data', (data) => {
-        this.handleData(data);
-      });
+      this.process.stdout?.on("data", (data) => {
+        this.handleData(data)
+      })
 
-      this.process.stderr?.on('data', (data) => {
-        console.error('Python stderr:', data.toString());
-        this.emit('stderr', data.toString());
-      });
+      this.process.stderr?.on("data", (data) => {
+        console.error("Python stderr:", data.toString())
+        this.emit("stderr", data.toString())
+      })
 
-      this.process.on('close', (code) => {
-        this.isInitialized = false;
-        this.emit('close', code);
-        
+      this.process.on("close", (code) => {
+        this.isInitialized = false
+        this.emit("close", code)
+
         // Reject all pending requests
         this.messageQueue.forEach(({ reject, timeout }) => {
-          clearTimeout(timeout);
-          reject(new Error(`Process closed with code ${code}`));
-        });
-        this.messageQueue.clear();
-      });
+          clearTimeout(timeout)
+          reject(new Error(`Process closed with code ${code}`))
+        })
+        this.messageQueue.clear()
+      })
 
-      this.process.on('error', (error) => {
-        this.isInitialized = false;
-        reject(error);
-      });
+      this.process.on("error", (error) => {
+        this.isInitialized = false
+        reject(error)
+      })
 
       // Wait for ready signal
-      this.once('ready', () => {
-        resolve();
-      });
+      this.once("ready", () => {
+        resolve()
+      })
 
       // Set initialization timeout
       setTimeout(() => {
         if (!this.isInitialized) {
-          reject(new Error('Bridge initialization timeout'));
+          reject(new Error("Bridge initialization timeout"))
         }
-      }, 10000);
-    });
+      }, 10000)
+    })
   }
 
   private handleData(data: Buffer): void {
-    this.buffer += data.toString();
-    
-    // Process complete messages (delimited by newlines)
-    const lines = this.buffer.split('\n');
-    this.buffer = lines.pop() || '';
+    this.buffer += data.toString()
 
-    lines.forEach(line => {
+    // Process complete messages (delimited by newlines)
+    const lines = this.buffer.split("\n")
+    this.buffer = lines.pop() || ""
+
+    lines.forEach((line) => {
       if (line.trim()) {
         try {
-          const message = JSON.parse(line);
-          
+          const message = JSON.parse(line)
+
           // Check for ready signal
-          if (message.type === 'ready') {
-            this.emit('ready');
-            return;
+          if (message.type === "ready") {
+            this.emit("ready")
+            return
           }
 
           // Validate JSON-RPC response
-          const response = JSONRPCResponseSchema.parse(message);
-          const pending = this.messageQueue.get(response.id);
-          
+          const response = JSONRPCResponseSchema.parse(message)
+          const pending = this.messageQueue.get(response.id)
+
           if (pending) {
-            clearTimeout(pending.timeout);
-            this.messageQueue.delete(response.id);
-            
+            clearTimeout(pending.timeout)
+            this.messageQueue.delete(response.id)
+
             if (response.error) {
               pending.resolve({
                 success: false,
                 error: response.error.message,
-                data: response.error.data
-              });
+                data: response.error.data,
+              })
             } else {
               pending.resolve({
                 success: true,
-                data: response.result
-              });
+                data: response.result,
+              })
             }
           }
         } catch (error) {
-          console.error('Failed to parse message:', line, error);
+          console.error("Failed to parse message:", line, error)
         }
       }
-    });
+    })
   }
 
   async call(request: DGMRequest): Promise<DGMResponse> {
     if (!this.isInitialized) {
-      throw new Error('Bridge not initialized');
+      throw new Error("Bridge not initialized")
     }
 
-    const id = ++this.messageId;
+    const id = ++this.messageId
     const jsonrpcRequest = {
-      jsonrpc: '2.0' as const,
+      jsonrpc: "2.0" as const,
       method: request.method,
       params: request.params,
-      id
-    };
+      id,
+    }
 
     return new Promise((resolve, reject) => {
       const timeout = setTimeout(() => {
-        this.messageQueue.delete(id);
-        reject(new Error(`Request timeout: ${request.method}`));
-      }, this.timeout);
+        this.messageQueue.delete(id)
+        reject(new Error(`Request timeout: ${request.method}`))
+      }, this.timeout)
 
-      this.messageQueue.set(id, { resolve, reject, timeout });
+      this.messageQueue.set(id, { resolve, reject, timeout })
 
       try {
-        this.process?.stdin?.write(JSON.stringify(jsonrpcRequest) + '\n');
+        this.process?.stdin?.write(JSON.stringify(jsonrpcRequest) + "\n")
       } catch (error) {
-        clearTimeout(timeout);
-        this.messageQueue.delete(id);
-        reject(error);
+        clearTimeout(timeout)
+        this.messageQueue.delete(id)
+        reject(error)
       }
-    });
+    })
   }
 
   // Convenience methods for common DGM operations
   async searchMemory(query: string, filters?: any): Promise<DGMResponse> {
     return this.call({
-      method: 'search_memory',
-      params: { query, filters }
-    });
+      method: "search_memory",
+      params: { query, filters },
+    })
   }
 
   async storeMemory(data: any, metadata?: any): Promise<DGMResponse> {
     return this.call({
-      method: 'store_memory',
-      params: { data, metadata }
-    });
+      method: "store_memory",
+      params: { data, metadata },
+    })
   }
 
   async updateMemory(id: string, updates: any): Promise<DGMResponse> {
     return this.call({
-      method: 'update_memory',
-      params: { id, updates }
-    });
+      method: "update_memory",
+      params: { id, updates },
+    })
   }
 
   async executeTool(toolName: string, params: any): Promise<DGMResponse> {
     return this.call({
-      method: 'execute_tool',
-      params: { tool_name: toolName, params }
-    });
+      method: "execute_tool",
+      params: { tool_name: toolName, params },
+    })
   }
 
   async getStats(): Promise<DGMResponse> {
     return this.call({
-      method: 'get_stats',
-      params: {}
-    });
+      method: "get_stats",
+      params: {},
+    })
+  }
+
+  // Generic execute method for backward compatibility
+  async execute(method: string, params?: any): Promise<any> {
+    const response = await this.call({
+      method,
+      params,
+    })
+
+    if (!response.success) {
+      throw new Error(response.error || "DGM execution failed")
+    }
+
+    return response.data
   }
 
   async close(): Promise<void> {
     if (this.process) {
       // Send shutdown command
       try {
-        await this.call({ method: 'shutdown' });
+        await this.call({ method: "shutdown" })
       } catch (error) {
         // Ignore errors during shutdown
       }
@@ -261,21 +327,21 @@ export class DGMBridge extends EventEmitter {
       // Force kill after timeout
       setTimeout(() => {
         if (this.process && !this.process.killed) {
-          this.process.kill('SIGTERM');
+          this.process.kill("SIGTERM")
         }
-      }, 5000);
+      }, 5000)
     }
 
-    this.isInitialized = false;
+    this.isInitialized = false
   }
 
   isReady(): boolean {
-    return this.isInitialized && this.process && !this.process.killed;
+    return this.isInitialized && !!this.process && !this.process.killed
   }
 
   // Restart the bridge if it crashes
   async restart(): Promise<void> {
-    await this.close();
-    await this.initialize();
+    await this.close()
+    await this.initialize()
   }
 }

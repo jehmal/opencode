@@ -5,7 +5,7 @@
 
 import {
   continuationPromptGenerator,
-  ProjectState,
+  type ProjectState,
 } from "./continuation-prompt-generator"
 
 // Sample project state for testing
@@ -182,28 +182,28 @@ export async function testVectorMemoryIntegration(): Promise<void> {
   // This would integrate with the actual Qdrant MCP server
   // For now, we'll simulate the test
 
-  const testMemory = {
-    information: `CONTINUATION PROMPT TEST - Generated Successfully
-Date: ${new Date().toISOString()}
-Project: OpenCode Continuation System Test
-Status: Generator function working correctly
-
-TEST RESULTS:
-✅ Prompt generation successful
-✅ Prompting techniques integrated
-✅ Memory search queries optimized
-✅ Sub-agent coordination structured
-✅ Reflexion insights captured
-
-GENERATED PROMPT CHARACTERISTICS:
-- Length: Comprehensive (2000+ characters)
-- Structure: Memory-first architecture
-- Techniques: Multi-agent, CoT, Reflexion, Iterative refinement
-- Validation: All required sections present
-- Integration: Vector memory compatible
-
-This test confirms the continuation prompt generator is working correctly and ready for production use.`,
-  }
+  // const testMemory = {
+  //   information: `CONTINUATION PROMPT TEST - Generated Successfully
+  // Date: ${new Date().toISOString()}
+  // Project: OpenCode Continuation System Test
+  // Status: Generator function working correctly
+  //
+  // TEST RESULTS:
+  // ✅ Prompt generation successful
+  // ✅ Prompting techniques integrated
+  // ✅ Memory search queries optimized
+  // ✅ Sub-agent coordination structured
+  // ✅ Reflexion insights captured
+  //
+  // GENERATED PROMPT CHARACTERISTICS:
+  // - Length: Comprehensive (2000+ characters)
+  // - Structure: Memory-first architecture
+  // - Techniques: Multi-agent, CoT, Reflexion, Iterative refinement
+  // - Validation: All required sections present
+  // - Integration: Vector memory compatible
+  //
+  // This test confirms the continuation prompt generator is working correctly and ready for production use.`,
+  // }
 
   console.log("✅ Vector memory test data prepared")
   console.log("✅ Memory format follows best practices (structured text)")

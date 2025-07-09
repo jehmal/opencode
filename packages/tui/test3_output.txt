@@ -1,0 +1,24 @@
+/continueC-m
+Command 'Help' not found, did you mean:
+  command 'yelp' from deb yelp (42.2-1)
+  command 'delp' from deb fp-utils-3.2.2 (3.2.2+dfsg-28)
+Try: sudo apt install <deb name>
+jehma@BigBoi:/mnt/c/Users/jehma/Desktop/AI/DGMSTT/opencode/packages/tui$ /contin
+ueC-m
+-bash: /continueC-m: No such file or directory
+jehma@BigBoi:/mnt/c/Users/jehma/Desktop/AI/DGMSTT/opencode/packages/tui$ /newC-m
+-bash: /newC-m: No such file or directory
+jehma@BigBoi:/mnt/c/Users/jehma/Desktop/AI/DGMSTT/opencode/packages/tui$ Debug t
+he WebSocket connection issues in the chat applicationC-m
+/newC-m
+Write comprehensive unit tests for the payment processing moduleC-m
+/continueC-m
+Debug: command not found
+jehma@BigBoi:/mnt/c/Users/jehma/Desktop/AI/DGMSTT/opencode/packages/tui$ /contin
+ueC-m
+-bash: /continueC-m: No such file or directory
+jehma@BigBoi:/mnt/c/Users/jehma/Desktop/AI/DGMSTT/opencode/packages/tui$ /newC-m
+-bash: /newC-m: No such file or directory
+jehma@BigBoi:/mnt/c/Users/jehma/Desktop/AI/DGMSTT/opencode/packages/tui$ Write c
+omprehensive unit tests for the payment processing moduleC-m
+

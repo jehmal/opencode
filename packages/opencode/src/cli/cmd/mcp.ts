@@ -37,10 +37,14 @@ export const McpListCommand = cmd({
   describe: "list all MCP servers",
   async handler() {
     UI.empty()
-    prompts.intro("MCP Servers " + UI.Style.TEXT_DIM + path.join("~", ".config", "dgmo", "config.json"))
+    prompts.intro(
+      "MCP Servers " +
+        UI.Style.TEXT_DIM +
+        path.join("~", ".config", "dgmo", "config.json"),
+    )
 
     const configPath = path.join(Global.Path.config, "config.json")
-    
+
     let config: any = {}
     try {
       const configContent = await fs.readFile(configPath, "utf-8")
@@ -51,7 +55,7 @@ export const McpListCommand = cmd({
 
     const mcpServers = config.mcp || {}
     const serverEntries = Object.entries(mcpServers)
-    
+
     if (serverEntries.length === 0) {
       prompts.log.info("No MCP servers configured")
       prompts.outro("Done")
@@ -61,12 +65,16 @@ export const McpListCommand = cmd({
     for (const [name, server] of serverEntries) {
       const serverConfig = server as ConfigType.Mcp
       const type = serverConfig.type
-      const enabled = serverConfig.enabled !== false ? "[enabled]" : "[disabled]"
-      const detail = serverConfig.type === "local" 
-        ? serverConfig.command.join(" ")
-        : serverConfig.url
-      
-      prompts.log.info(`●  ${name} ${UI.Style.TEXT_DIM}${type}${UI.Style.TEXT_NORMAL} ${enabled}${UI.Style.TEXT_NORMAL} ${UI.Style.TEXT_DIM}${detail}`)
+      const enabled =
+        serverConfig.enabled !== false ? "[enabled]" : "[disabled]"
+      const detail =
+        serverConfig.type === "local"
+          ? serverConfig.command.join(" ")
+          : serverConfig.url
+
+      prompts.log.info(
+        `●  ${name} ${UI.Style.TEXT_DIM}${type}${UI.Style.TEXT_NORMAL} ${enabled}${UI.Style.TEXT_NORMAL} ${UI.Style.TEXT_DIM}${detail}`,
+      )
     }
 
     prompts.outro(`${serverEntries.length} MCP servers`)
@@ -144,7 +152,8 @@ export const McpAddCommand = cmd({
       serverConfig = {
         type: "local",
         command: command.split(/\s+/),
-        environment: Object.keys(environment).length > 0 ? environment : undefined,
+        environment:
+          Object.keys(environment).length > 0 ? environment : undefined,
       }
     } else {
       const url = await prompts.text({
@@ -217,7 +226,9 @@ export const McpAddCommand = cmd({
             throw new Error("Failed to connect")
           }
           const tools = await client.tools()
-          prompts.log.success(`Connected! Found ${Object.keys(tools).length} tools`)
+          prompts.log.success(
+            `Connected! Found ${Object.keys(tools).length} tools`,
+          )
         })
       } catch (error) {
         prompts.log.error(`Failed to connect: ${error}`)
@@ -267,7 +278,7 @@ export const McpRemoveCommand = cmd({
     }
 
     let name: string
-    
+
     if (serverNameArg) {
       // Use the provided server name
       if (!mcpServers[serverNameArg]) {
@@ -363,9 +374,9 @@ async function toggleMcpServer(enable: boolean, serverNameArg?: string) {
   }
 
   const mcpServers = config.mcp || {}
-  
+
   let name: string
-  
+
   if (serverNameArg) {
     // Use the provided server name
     if (!mcpServers[serverNameArg]) {
@@ -373,22 +384,22 @@ async function toggleMcpServer(enable: boolean, serverNameArg?: string) {
       prompts.outro("Failed")
       return
     }
-    
+
     const server = mcpServers[serverNameArg] as Config.Mcp
     const isEnabled = server.enabled !== false
-    
+
     if (enable && isEnabled) {
       prompts.log.warn(`Server "${serverNameArg}" is already enabled`)
       prompts.outro("No change needed")
       return
     }
-    
+
     if (!enable && !isEnabled) {
       prompts.log.warn(`Server "${serverNameArg}" is already disabled`)
       prompts.outro("No change needed")
       return
     }
-    
+
     name = serverNameArg
   } else {
     // Interactive selection
@@ -457,85 +468,89 @@ export const McpStatusCommand = cmd({
         const config = await Config.get()
         const mcpServers = config.mcp || {}
 
-      if (serverName) {
-        // Show status for specific server
-        if (!mcpServers[serverName]) {
-          prompts.log.error(`Server "${serverName}" not found in configuration`)
-          prompts.outro("Failed")
-          return
-        }
-
-        const server = mcpServers[serverName]
-        const client = clients[serverName]
-        const isConnected = !!client
-
-        prompts.log.info(
-          `${UI.Style.TEXT_HIGHLIGHT_BOLD}${serverName}${UI.Style.TEXT_NORMAL}`,
-        )
-        prompts.log.info(`  Type: ${server.type}`)
-        prompts.log.info(
-          `  Enabled: ${server.enabled !== false ? "✅ Yes" : "❌ No"}`,
-        )
-        prompts.log.info(
-          `  Status: ${isConnected ? "✅ Connected" : "❌ Disconnected"}`,
-        )
-
-        if (server.type === "local") {
-          prompts.log.info(`  Command: ${server.command.join(" ")}`)
-          if (server.environment) {
-            prompts.log.info(
-              `  Environment: ${Object.entries(server.environment)
-                .map(([k, v]) => `${k}=${v}`)
-                .join(", ")}`,
+        if (serverName) {
+          // Show status for specific server
+          if (!mcpServers[serverName]) {
+            prompts.log.error(
+              `Server "${serverName}" not found in configuration`,
             )
-          }
-        } else {
-          prompts.log.info(`  URL: ${server.url}`)
-        }
-
-        if (isConnected) {
-          try {
-            const tools = await client.tools()
-            prompts.log.info(`  Tools: ${Object.keys(tools).length} available`)
-          } catch (error) {
-            prompts.log.warn(`  Tools: Error loading (${error})`)
-          }
-        }
-      } else {
-        // Show status for all servers
-        const serverEntries = Object.entries(mcpServers)
-
-        if (serverEntries.length === 0) {
-          prompts.log.info("No MCP servers configured")
-        } else {
-          for (const [name, server] of serverEntries) {
-            const client = clients[name]
-            const isConnected = !!client
-            const isEnabled = server.enabled !== false
-
-            let statusIcon = "❌"
-            if (isEnabled && isConnected) statusIcon = "✅"
-            else if (!isEnabled) statusIcon = "⚫"
-            else if (isEnabled && !isConnected) statusIcon = "⚠️"
-
-            const typeLabel = server.type === "local" ? "local" : "remote"
-            const detail =
-              server.type === "local" ? server.command.join(" ") : server.url
-
-            prompts.log.info(
-              `${statusIcon} ${name} ${UI.Style.TEXT_DIM}${typeLabel}${UI.Style.TEXT_NORMAL} ${UI.Style.TEXT_DIM}${detail}${UI.Style.TEXT_NORMAL}`,
-            )
+            prompts.outro("Failed")
+            return
           }
 
-          const connectedCount = Object.keys(clients).length
-          const totalCount = serverEntries.length
+          const server = mcpServers[serverName]
+          const client = clients[serverName]
+          const isConnected = !!client
+
           prompts.log.info(
-            `\n${connectedCount}/${totalCount} servers connected`,
+            `${UI.Style.TEXT_HIGHLIGHT_BOLD}${serverName}${UI.Style.TEXT_NORMAL}`,
           )
-        }
-      }
+          prompts.log.info(`  Type: ${server.type}`)
+          prompts.log.info(
+            `  Enabled: ${server.enabled !== false ? "✅ Yes" : "❌ No"}`,
+          )
+          prompts.log.info(
+            `  Status: ${isConnected ? "✅ Connected" : "❌ Disconnected"}`,
+          )
 
-      prompts.outro("Done")
+          if (server.type === "local") {
+            prompts.log.info(`  Command: ${server.command.join(" ")}`)
+            if (server.environment) {
+              prompts.log.info(
+                `  Environment: ${Object.entries(server.environment)
+                  .map(([k, v]) => `${k}=${v}`)
+                  .join(", ")}`,
+              )
+            }
+          } else {
+            prompts.log.info(`  URL: ${server.url}`)
+          }
+
+          if (isConnected) {
+            try {
+              const tools = await client.tools()
+              prompts.log.info(
+                `  Tools: ${Object.keys(tools).length} available`,
+              )
+            } catch (error) {
+              prompts.log.warn(`  Tools: Error loading (${error})`)
+            }
+          }
+        } else {
+          // Show status for all servers
+          const serverEntries = Object.entries(mcpServers)
+
+          if (serverEntries.length === 0) {
+            prompts.log.info("No MCP servers configured")
+          } else {
+            for (const [name, server] of serverEntries) {
+              const client = clients[name]
+              const isConnected = !!client
+              const isEnabled = server.enabled !== false
+
+              let statusIcon = "❌"
+              if (isEnabled && isConnected) statusIcon = "✅"
+              else if (!isEnabled) statusIcon = "⚫"
+              else if (isEnabled && !isConnected) statusIcon = "⚠️"
+
+              const typeLabel = server.type === "local" ? "local" : "remote"
+              const detail =
+                server.type === "local" ? server.command.join(" ") : server.url
+
+              prompts.log.info(
+                `${statusIcon} ${name} ${UI.Style.TEXT_DIM}${typeLabel}${UI.Style.TEXT_NORMAL} ${UI.Style.TEXT_DIM}${detail}${UI.Style.TEXT_NORMAL}`,
+              )
+            }
+
+            const connectedCount = Object.keys(clients).length
+            const totalCount = serverEntries.length
+            prompts.log.info(
+              `\n${connectedCount}/${totalCount} servers connected`,
+            )
+          }
+        }
+
+        prompts.outro("Done")
       })
     } catch (error) {
       prompts.log.error(`Failed to get server status: ${error}`)
@@ -585,7 +600,7 @@ export const McpTestCommand = cmd({
         let passedTests = 0
         const totalTests = serversToTest.length
 
-        for (const [name, server] of serversToTest) {
+        for (const [name, _server] of serversToTest) {
           prompts.log.info(
             `\n${UI.Style.TEXT_HIGHLIGHT_BOLD}${name}${UI.Style.TEXT_NORMAL}`,
           )
@@ -603,7 +618,9 @@ export const McpTestCommand = cmd({
 
             prompts.log.info("  🔄 Loading tools...")
             const tools = await client.tools()
-            prompts.log.success(`  ✅ Tools: ${Object.keys(tools).length} available`)
+            prompts.log.success(
+              `  ✅ Tools: ${Object.keys(tools).length} available`,
+            )
 
             passedTests++
           } catch (error) {
@@ -653,82 +670,82 @@ export const McpToolsCommand = cmd({
         const allTools = await MCP.tools()
 
         if (serverName) {
-        // Show tools for specific server
-        const client = clients[serverName]
-        if (!client) {
-          prompts.log.error(`Server "${serverName}" not connected`)
-          prompts.outro("Failed")
-          return
-        }
+          // Show tools for specific server
+          const client = clients[serverName]
+          if (!client) {
+            prompts.log.error(`Server "${serverName}" not connected`)
+            prompts.outro("Failed")
+            return
+          }
 
-        try {
-          const tools = await client.tools()
-          const toolEntries = Object.entries(tools)
+          try {
+            const tools = await client.tools()
+            const toolEntries = Object.entries(tools)
 
-          if (toolEntries.length === 0) {
-            prompts.log.info("No tools available")
-          } else {
-            for (const [toolName, tool] of toolEntries) {
-              prompts.log.info(
-                `\n${UI.Style.TEXT_HIGHLIGHT_BOLD}${toolName}${UI.Style.TEXT_NORMAL}`,
-              )
-              if (tool.description) {
-                prompts.log.info(`  ${tool.description}`)
-              }
-              if (tool.inputSchema) {
+            if (toolEntries.length === 0) {
+              prompts.log.info("No tools available")
+            } else {
+              for (const [toolName, tool] of toolEntries) {
                 prompts.log.info(
-                  `  ${UI.Style.TEXT_DIM}Parameters: ${JSON.stringify(tool.inputSchema)}${UI.Style.TEXT_NORMAL}`,
+                  `\n${UI.Style.TEXT_HIGHLIGHT_BOLD}${toolName}${UI.Style.TEXT_NORMAL}`,
+                )
+                if (tool.description) {
+                  prompts.log.info(`  ${tool.description}`)
+                }
+                if (tool.parameters) {
+                  prompts.log.info(
+                    `  ${UI.Style.TEXT_DIM}Parameters: ${JSON.stringify(tool.parameters)}${UI.Style.TEXT_NORMAL}`,
+                  )
+                }
+              }
+            }
+
+            prompts.outro(`${toolEntries.length} tools`)
+          } catch (error) {
+            prompts.log.error(`Failed to load tools: ${error}`)
+            prompts.outro("Failed")
+          }
+        } else {
+          // Show tools from all connected servers
+          const toolsByServer: Record<string, string[]> = {}
+          let totalTools = 0
+
+          for (const [toolName, _tool] of Object.entries(allTools)) {
+            const serverPrefix = toolName.split("_")[0]
+            if (!toolsByServer[serverPrefix]) {
+              toolsByServer[serverPrefix] = []
+            }
+            toolsByServer[serverPrefix].push(toolName)
+            totalTools++
+          }
+
+          if (totalTools === 0) {
+            prompts.log.info("No tools available from any server")
+          } else {
+            for (const [server, toolNames] of Object.entries(toolsByServer)) {
+              prompts.log.info(
+                `\n${UI.Style.TEXT_HIGHLIGHT_BOLD}${server}${UI.Style.TEXT_NORMAL} ${UI.Style.TEXT_DIM}(${toolNames.length} tools)${UI.Style.TEXT_NORMAL}`,
+              )
+              for (const toolName of toolNames.slice(0, 5)) {
+                const tool = allTools[toolName]
+                prompts.log.info(
+                  `  ${toolName}${tool.description ? ` - ${tool.description}` : ""}`,
+                )
+              }
+              if (toolNames.length > 5) {
+                prompts.log.info(
+                  `  ${UI.Style.TEXT_DIM}... and ${toolNames.length - 5} more${UI.Style.TEXT_NORMAL}`,
                 )
               }
             }
-          }
 
-          prompts.outro(`${toolEntries.length} tools`)
-        } catch (error) {
-          prompts.log.error(`Failed to load tools: ${error}`)
-          prompts.outro("Failed")
-        }
-      } else {
-        // Show tools from all connected servers
-        const toolsByServer: Record<string, string[]> = {}
-        let totalTools = 0
-
-        for (const [toolName, tool] of Object.entries(allTools)) {
-          const serverPrefix = toolName.split("_")[0]
-          if (!toolsByServer[serverPrefix]) {
-            toolsByServer[serverPrefix] = []
-          }
-          toolsByServer[serverPrefix].push(toolName)
-          totalTools++
-        }
-
-        if (totalTools === 0) {
-          prompts.log.info("No tools available from any server")
-        } else {
-          for (const [server, toolNames] of Object.entries(toolsByServer)) {
             prompts.log.info(
-              `\n${UI.Style.TEXT_HIGHLIGHT_BOLD}${server}${UI.Style.TEXT_NORMAL} ${UI.Style.TEXT_DIM}(${toolNames.length} tools)${UI.Style.TEXT_NORMAL}`,
+              `\n${totalTools} total tools from ${Object.keys(toolsByServer).length} servers`,
             )
-            for (const toolName of toolNames.slice(0, 5)) {
-              const tool = allTools[toolName]
-              prompts.log.info(
-                `  ${toolName}${tool.description ? ` - ${tool.description}` : ""}`,
-              )
-            }
-            if (toolNames.length > 5) {
-              prompts.log.info(
-                `  ${UI.Style.TEXT_DIM}... and ${toolNames.length - 5} more${UI.Style.TEXT_NORMAL}`,
-              )
-            }
           }
 
-          prompts.log.info(
-            `\n${totalTools} total tools from ${Object.keys(toolsByServer).length} servers`,
-          )
+          prompts.outro("Done")
         }
-
-        prompts.outro("Done")
-      }
       })
     } catch (error) {
       prompts.log.error(`Failed to list tools: ${error}`)
@@ -899,7 +916,9 @@ export const McpDebugCommand = cmd({
         prompts.log.info(
           `${UI.Style.TEXT_HIGHLIGHT_BOLD}Global Configuration${UI.Style.TEXT_NORMAL}`,
         )
-        prompts.log.info(`  Config path: ${path.join(Global.Path.config, "config.json")}`)
+        prompts.log.info(
+          `  Config path: ${path.join(Global.Path.config, "config.json")}`,
+        )
         prompts.log.info(`  Total servers: ${Object.keys(mcpServers).length}`)
         prompts.log.info(
           `  Enabled servers: ${Object.values(mcpServers).filter((s) => s.enabled !== false).length}`,

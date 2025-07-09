@@ -23,6 +23,7 @@ import { NamedError } from "../util/error"
 import { Auth } from "../auth"
 import { TaskTool } from "../tool/task"
 import { DiagnoseTool } from "../tool/diagnose"
+import { DGMSessionManager } from "../dgm/session-manager"
 export namespace Provider {
   const log = Log.create({ service: "provider" })
 
@@ -498,15 +499,25 @@ export namespace Provider {
       )
         */
     const baseTools = TOOL_MAPPING[providerID] ?? TOOLS
+    const allTools = [...baseTools]
 
     // Add TaskTool dynamically to avoid circular dependency
     try {
       const taskTool = await getTaskTool()
-      return [...baseTools, taskTool]
+      allTools.push(taskTool)
     } catch (e) {
-      // If TaskTool fails to load, return base tools
-      return baseTools
+      // If TaskTool fails to load, continue without it
     }
+
+    // Add DGM tools if available
+    try {
+      const dgmTools = await DGMSessionManager.getTools()
+      allTools.push(...dgmTools)
+    } catch (e) {
+      // If DGM tools fail to load, continue without them
+    }
+
+    return allTools
   }
 
   function optionalToNullable(schema: z.ZodTypeAny): z.ZodTypeAny {

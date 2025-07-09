@@ -82,7 +82,7 @@ export namespace ProgressVisualization {
         case DisplayFormat.SPINNER:
           return this.renderSpinner(progress, taskID)
         case DisplayFormat.DOTS:
-          return this.renderDots(progress, taskID)
+          return this.renderDots(progress)
         case DisplayFormat.DETAILED:
           return this.renderDetailed(progress, taskID)
         default:
@@ -91,7 +91,7 @@ export namespace ProgressVisualization {
     }
 
     private renderBar(progress: number, taskID?: string): string {
-      const { width, showPercentage, showETA, colors } = this.config
+      const { width, showPercentage, showETA } = this.config
       const completed = Math.floor((progress / 100) * width)
       const remaining = width - completed
 
@@ -133,7 +133,7 @@ export namespace ProgressVisualization {
       return `${Colors.cyan}Progress:${Colors.reset} ${percentage}`
     }
 
-    private renderSpinner(progress: number, taskID?: string): string {
+    private renderSpinner(progress: number, _taskID?: string): string {
       const spinners = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"]
       const spinner = spinners[this.animationFrame % spinners.length]
       this.animationFrame++

@@ -27,12 +27,14 @@ import (
 
 // Global map to track task start times and progress
 var (
-	taskStartTimes  = make(map[string]time.Time)
-	taskProgress    = make(map[string]int)
-	taskCurrentTool = make(map[string]string)
-	taskPhase       = make(map[string]string)
-	taskMessage     = make(map[string]string)
-	taskMutex       sync.RWMutex
+	taskStartTimes    = make(map[string]time.Time)
+	taskProgress      = make(map[string]int)
+	taskCurrentTool   = make(map[string]string)
+	taskPhase         = make(map[string]string)
+	taskMessage       = make(map[string]string)
+	taskAgentNumbers  = make(map[string]int32) // taskID -> agent number
+	sessionAgentCount = make(map[string]int32) // sessionID -> next agent number
+	taskMutex         sync.RWMutex
 )
 
 // UpdateTaskProgress updates the progress for a task
@@ -40,6 +42,127 @@ func UpdateTaskProgress(taskID string, progress int) {
 	taskMutex.Lock()
 	defer taskMutex.Unlock()
 	taskProgress[taskID] = progress
+}
+
+// RegisterTaskAgent registers a task with its agent number
+func RegisterTaskAgent(taskID string, sessionID string, agentNumber int32) {
+	taskMutex.Lock()
+	defer taskMutex.Unlock()
+	taskAgentNumbers[taskID] = agentNumber
+}
+
+// GetTaskAgentNumber gets the agent number for a task
+func GetTaskAgentNumber(taskID string) int32 {
+	taskMutex.RLock()
+	defer taskMutex.RUnlock()
+	if agentNum, ok := taskAgentNumbers[taskID]; ok {
+		return agentNum
+	}
+	return 0 // Return 0 to indicate "not found"
+}
+
+// GetTaskAgentNumberWithFound gets the agent number for a task and whether it was found
+func GetTaskAgentNumberWithFound(taskID string) (int32, bool) {
+	taskMutex.RLock()
+	defer taskMutex.RUnlock()
+	agentNum, ok := taskAgentNumbers[taskID]
+	return agentNum, ok
+}
+
+// GetNextAgentNumber gets the next agent number for a session
+func GetNextAgentNumber(sessionID string) int32 {
+	taskMutex.Lock()
+	defer taskMutex.Unlock()
+	sessionAgentCount[sessionID]++
+	return sessionAgentCount[sessionID]
+}
+
+// UpdateTaskCurrentTool updates the current tool for a task
+func UpdateTaskCurrentTool(taskID string, tool string) {
+	taskMutex.Lock()
+	defer taskMutex.Unlock()
+	taskCurrentTool[taskID] = tool
+}
+
+// GetTaskCurrentTool gets the current tool for a task
+func GetTaskCurrentTool(taskID string) string {
+	taskMutex.RLock()
+	defer taskMutex.RUnlock()
+	return taskCurrentTool[taskID]
+}
+
+// UpdateTaskMessage updates the current message for a task
+func UpdateTaskMessage(taskID string, message string) {
+	taskMutex.Lock()
+	defer taskMutex.Unlock()
+	taskMessage[taskID] = message
+}
+
+// GetTaskMessage gets the current message for a task
+func GetTaskMessage(taskID string) string {
+	taskMutex.RLock()
+	defer taskMutex.RUnlock()
+	return taskMessage[taskID]
+}
+
+// GenerateProgressLines creates Claude Code style progress lines
+func GenerateProgressLines(taskID string) []string {
+	taskMutex.RLock()
+	defer taskMutex.RUnlock()
+
+	var lines []string
+	tool := taskCurrentTool[taskID]
+	message := taskMessage[taskID]
+
+	if tool != "" && message != "" {
+		// Extract file information from message if present
+		if strings.Contains(message, "/") {
+			// Likely a file path
+			lines = append(lines, fmt.Sprintf("📂 %s", extractFileName(message)))
+		}
+
+		// Add tool-specific emoji and action
+		toolEmoji := getToolEmoji(tool)
+		lines = append(lines, fmt.Sprintf("%s %s", toolEmoji, message))
+
+		// Add duration if available
+		if len(lines) < 3 {
+			lines = append(lines, fmt.Sprintf("⏱️  Running for %.1fs", time.Since(time.Now()).Seconds()))
+		}
+	}
+
+	return lines
+}
+
+// getToolEmoji returns an emoji for the tool
+func getToolEmoji(tool string) string {
+	switch strings.ToLower(tool) {
+	case "read":
+		return "📖"
+	case "write":
+		return "✍️"
+	case "edit":
+		return "✏️"
+	case "bash":
+		return "💻"
+	case "grep":
+		return "🔍"
+	case "glob":
+		return "📁"
+	case "list":
+		return "📋"
+	default:
+		return "⚡"
+	}
+}
+
+// extractFileName extracts filename from a path
+func extractFileName(path string) string {
+	if strings.Contains(path, "/") {
+		parts := strings.Split(path, "/")
+		return parts[len(parts)-1]
+	}
+	return path
 }
 
 // GetTaskProgress gets the progress for a task
@@ -86,23 +209,6 @@ func GetTaskPhase(taskID string) string {
 	return ""
 }
 
-// UpdateTaskMessage updates the message for a task
-func UpdateTaskMessage(taskID string, message string) {
-	taskMutex.Lock()
-	defer taskMutex.Unlock()
-	taskMessage[taskID] = message
-}
-
-// GetTaskMessage gets the message for a task
-func GetTaskMessage(taskID string) string {
-	taskMutex.RLock()
-	defer taskMutex.RUnlock()
-	if msg, ok := taskMessage[taskID]; ok {
-		return msg
-	}
-	return ""
-}
-
 func toMarkdown(content string, width int, backgroundColor compat.AdaptiveColor) string {
 	r := styles.GetMarkdownRenderer(width-7, backgroundColor)
 	content = strings.ReplaceAll(content, app.RootPath+"/", "")
@@ -127,6 +233,144 @@ func toMarkdown(content string, width int, backgroundColor compat.AdaptiveColor)
 	}
 	content = strings.Join(lines, "\n")
 	return strings.TrimSuffix(content, "\n")
+}
+
+// renderTechniqueInfo renders prompting technique information for a message
+func renderTechniqueInfo(metadata opencode.MessageMetadata) string {
+	// WORKAROUND: Extract technique info from modelID field
+	// Format: "model-name|TECHNIQUES:tech1,tech2"
+	if metadata.Assistant.ModelID != "" {
+		modelID := metadata.Assistant.ModelID
+		if strings.Contains(modelID, "|TECHNIQUES:") {
+			parts := strings.Split(modelID, "|TECHNIQUES:")
+			if len(parts) == 2 {
+				techniquesStr := parts[1]
+				techniques := strings.Split(techniquesStr, ",")
+				if len(techniques) > 0 && techniques[0] != "" {
+					return formatTechniqueNames(techniques)
+				}
+			}
+		}
+	}
+
+	// Fallback: Try to access prompting data through JSON.ExtraFields (in case SDK is updated)
+	if metadata.Assistant.JSON.ExtraFields != nil {
+		prompting := metadata.Assistant.JSON.ExtraFields["prompting"]
+		if !prompting.IsNull() {
+			// Parse the prompting data using gjson
+			promptingData := gjson.Parse(prompting.Raw())
+
+			// Extract techniques array
+			techniques := promptingData.Get("techniques").Array()
+			if len(techniques) > 0 {
+				techniqueNames := []string{}
+				for _, tech := range techniques {
+					techniqueNames = append(techniqueNames, tech.String())
+				}
+				if len(techniqueNames) > 0 {
+					return formatTechniqueNames(techniqueNames)
+				}
+			}
+		}
+	}
+	return ""
+}
+
+// cleanModelID removes technique info from modelID for display
+func cleanModelID(modelID string) string {
+	if strings.Contains(modelID, "|TECHNIQUES:") {
+		parts := strings.Split(modelID, "|TECHNIQUES:")
+		if len(parts) > 0 {
+			return parts[0]
+		}
+	}
+	return modelID
+}
+
+// getCompactTechniqueDescription returns a brief description based on active techniques
+func getCompactTechniqueDescription(techniques []string) string {
+	descriptions := map[string]string{
+		"cot":                  "step-by-step reasoning",
+		"few_shot":             "example-based learning",
+		"react":                "reasoning and acting",
+		"tot":                  "exploring thought trees",
+		"self_consistency":     "multiple reasoning paths",
+		"constitutional_ai":    "self-critique and improvement",
+		"meta_prompting":       "optimal prompt generation",
+		"iterative_refinement": "progressive improvement",
+		"active_prompt":        "adaptive prompting",
+		"pal":                  "program-aided reasoning",
+		"reflexion":            "self-reflection learning",
+		"generated_knowledge":  "knowledge generation",
+		"prompt_chaining":      "chained subtasks",
+		"persona":              "role-based perspective",
+		"multi_agent":          "coordinated agents",
+		"consensus_building":   "agreement through deliberation",
+		"hierarchical":         "hierarchical decomposition",
+	}
+
+	// Build a description based on the techniques
+	var descParts []string
+	for _, tech := range techniques {
+		if desc, ok := descriptions[strings.ToLower(tech)]; ok {
+			descParts = append(descParts, desc)
+		}
+	}
+
+	if len(descParts) == 0 {
+		return "Enhanced reasoning active"
+	} else if len(descParts) == 1 {
+		return "Enhanced with " + descParts[0]
+	} else if len(descParts) == 2 {
+		return "Enhanced with " + descParts[0] + " and " + descParts[1]
+	} else {
+		// For 3 or more, just use the first two and add "and more"
+		return "Enhanced with " + descParts[0] + ", " + descParts[1] + " and more"
+	}
+}
+
+// formatTechniqueNames formats technique names for display
+func formatTechniqueNames(techniques []string) string {
+	// Map full technique names to abbreviations
+	abbreviations := map[string]string{
+		"chain-of-thought":        "CoT",
+		"few-shot":                "FS",
+		"tree-of-thoughts":        "ToT",
+		"react":                   "ReAct",
+		"self-consistency":        "SC",
+		"least-to-most":           "LtM",
+		"step-back":               "SB",
+		"analogical":              "AR",
+		"socratic":                "SM",
+		"maieutic":                "MP",
+		"constitutional-ai":       "CAI",
+		"meta-prompting":          "MP",
+		"role-play":               "RP",
+		"perspective-shift":       "PS",
+		"constraint-based":        "CB",
+		"recursive-decomposition": "RD",
+		"iterative-refinement":    "IR",
+		"adversarial":             "AP",
+	}
+
+	result := []string{}
+	for _, tech := range techniques {
+		if abbr, ok := abbreviations[tech]; ok {
+			result = append(result, abbr)
+		} else {
+			// If no abbreviation, use first 3 letters capitalized
+			if len(tech) >= 3 {
+				result = append(result, strings.ToUpper(tech[:3]))
+			} else {
+				result = append(result, strings.ToUpper(tech))
+			}
+		}
+	}
+
+	if len(result) > 0 {
+		return "◆ " + strings.Join(result, "+")
+	}
+	return ""
 }
 
 type blockRenderer struct {
@@ -285,7 +529,30 @@ func renderText(
 		// don't show the date if it's today
 		timestamp = timestamp[12:]
 	}
-	info := fmt.Sprintf("%s (%s)", author, timestamp)
+	
+	// Extract techniques from author (modelID) if present
+	techniqueInfo := ""
+	if strings.Contains(author, "|TECHNIQUES:") {
+		parts := strings.Split(author, "|TECHNIQUES:")
+		if len(parts) == 2 {
+			techniques := strings.Split(parts[1], ",")
+			var coloredAbbrevs []string
+			for _, tech := range techniques {
+				if abbrev := getMinimalTechniqueAbbrev(tech); abbrev != "" {
+					// Apply color based on technique type
+					coloredAbbrev := getColoredTechniqueAbbrev(abbrev, t)
+					coloredAbbrevs = append(coloredAbbrevs, coloredAbbrev)
+				}
+			}
+			if len(coloredAbbrevs) > 0 {
+				// Use bullet separator with theme color
+				separator := lipgloss.NewStyle().Foreground(t.TextMuted()).Render(" • ")
+				techniqueInfo = separator + strings.Join(coloredAbbrevs, " ")
+			}
+		}
+	}
+	
+	info := fmt.Sprintf("%s (%s)%s", cleanModelID(author), timestamp, techniqueInfo)
 
 	messageStyle := styles.NewStyle().
 		Background(t.BackgroundPanel()).
@@ -298,7 +565,6 @@ func renderText(
 	if message.Role == opencode.MessageRoleAssistant {
 		content = toMarkdown(text, width, t.BackgroundPanel())
 	}
-
 	if !showToolDetails && toolCalls != nil && len(toolCalls) > 0 {
 		content = content + "\n\n"
 		for _, toolCall := range toolCalls {
@@ -318,7 +584,7 @@ func renderText(
 					style = style.Foreground(t.Error())
 				}
 				title = style.Render(title)
-				title = "∟ " + title + "\n"
+				title = title + "\n"
 				content = content + title
 			}
 		}
@@ -498,7 +764,6 @@ func renderToolDetails(
 						_ = json.Unmarshal(data, &toolMetadata)
 
 						step := renderToolTitle(toolCall, messageMetadata, width)
-						step = "∟ " + step
 						steps = append(steps, step)
 					}
 				}
@@ -646,9 +911,6 @@ func renderToolTitle(
 		}
 	case "task":
 		if description, ok := toolArgsMap["description"].(string); ok {
-			// Use the beautiful task renderer
-			icon := getTaskIcon(description)
-
 			// Determine status based on tool invocation state
 			status := "running"
 			if toolCall.ToolInvocation.State == "result" {
@@ -672,27 +934,15 @@ func renderToolTitle(
 				duration = time.Since(startTime)
 			}
 
-			// Get task metadata from global maps
-			message := GetTaskMessage(taskKey)
-
-			// If we have a custom message, use the message-based renderer
-			if message != "" {
-				return RenderTaskBoxWithMessage(icon, description, "", status, message, duration, width)
+			// Get agent number from stored task info, fallback to extraction
+			agentNumber, found := GetTaskAgentNumberWithFound(toolCall.ToolInvocation.ToolCallID)
+			if !found {
+				// Fallback to extraction if not found in storage
+				agentNumber = int32(extractAgentNumberFromDescription(description))
 			}
 
-			// Otherwise fall back to the old behavior
-			progress := GetTaskProgress(taskKey)
-
-			// Debug: If progress is 0 for running tasks, start with 25%
-			if status == "running" && progress == 0 {
-				progress = 25
-			}
-
-			// Get current tool for dynamic status
-			currentTool := GetTaskTool(taskKey)
-
-			// Use the beautiful task renderer with tool info
-			return RenderTaskBoxWithTool(icon, description, "", status, progress, duration, width, currentTool)
+			// Use the new compact MCP-like task renderer with progress
+			return RenderTaskCompactWithProgress(toolCall.ToolInvocation.ToolCallID, int(agentNumber), description, status, duration, startTime)
 		}
 	case "webfetch":
 		toolArgs = renderArgs(&toolArgsMap, "url")
@@ -926,6 +1176,167 @@ func renderDiagnostics(metadata opencode.MessageMetadataTool, filePath string) s
 	// 	return ""
 	// }
 
+}
+
+// renderPromptingTechnique creates a compact display for prompting techniques
+func renderPromptingTechnique(metadata opencode.MessageMetadata, width int) string {
+	// Extract technique info from modelID workaround
+	if metadata.Assistant.ModelID == "" {
+		return ""
+	}
+
+	// Debug: Log that we're in the new rendering function
+	// fmt.Fprintf(os.Stderr, "DEBUG: renderPromptingTechnique called with modelID: %s\n", metadata.Assistant.ModelID)
+
+	modelID := metadata.Assistant.ModelID
+	if !strings.Contains(modelID, "|TECHNIQUES:") {
+		// fmt.Fprintf(os.Stderr, "DEBUG: No techniques found in modelID\n")
+		return ""
+	}
+
+	parts := strings.Split(modelID, "|TECHNIQUES:")
+	if len(parts) != 2 {
+		return ""
+	}
+
+	techniquesStr := parts[1]
+	techniques := strings.Split(techniquesStr, ",")
+	if len(techniques) == 0 || techniques[0] == "" {
+		return ""
+	}
+
+	// Get minimal abbreviations for each technique
+	var abbrevs []string
+	for _, tech := range techniques {
+		abbrev := getMinimalTechniqueAbbrev(tech)
+		if abbrev != "" {
+			abbrevs = append(abbrevs, abbrev)
+		}
+	}
+	
+	if len(abbrevs) == 0 {
+		return ""
+	}
+	
+	// Join abbreviations with a dot separator for minimal display
+	techniqueText := strings.Join(abbrevs, " • ")
+	
+	// Apply theme-appropriate styling - subtle and minimal
+	t := theme.CurrentTheme()
+	techniqueStyle := lipgloss.NewStyle().
+		Foreground(t.TextMuted()). // Use muted color for discreteness
+		Italic(true)                // Italic for subtle differentiation
+	
+	// Return just the styled abbreviation text, no box or decorations
+	return techniqueStyle.Render(techniqueText)
+}
+
+// getMinimalTechniqueAbbrev returns a minimal abbreviation for a technique
+func getMinimalTechniqueAbbrev(technique string) string {
+	abbrevs := map[string]string{
+		"chain-of-thought":         "CoT",
+		"chain_of_thought":         "CoT",
+		"cot":                      "CoT",
+		"few-shot":                 "FS",
+		"few_shot":                 "FS",
+		"tree-of-thoughts":         "ToT",
+		"tree_of_thoughts":         "ToT",
+		"tot":                      "ToT",
+		"react":                    "ReAct",
+		"self-consistency":         "SC",
+		"self_consistency":         "SC",
+		"least-to-most":            "LtM",
+		"least_to_most":            "LtM",
+		"step-back":                "SB",
+		"step_back":                "SB",
+		"analogical":               "AR",
+		"socratic":                 "SM",
+		"maieutic":                 "MP",
+		"constitutional-ai":        "CAI",
+		"constitutional_ai":        "CAI",
+		"meta-prompting":           "MetaP",
+		"meta_prompting":           "MetaP",
+		"role-play":                "RP",
+		"role_play":                "RP",
+		"perspective-shift":        "PS",
+		"perspective_shift":        "PS",
+		"constraint-based":         "CB",
+		"constraint_based":         "CB",
+		"recursive-decomposition":  "RD",
+		"recursive_decomposition":  "RD",
+		"iterative-refinement":     "IR",
+		"iterative_refinement":     "IR",
+		"adversarial":              "AP",
+		"active-prompt":            "ActP",
+		"active_prompt":            "ActP",
+		"pal":                      "PAL",
+		"reflexion":                "Rfx",
+		"generated-knowledge":      "GK",
+		"generated_knowledge":      "GK",
+		"prompt-chaining":          "PC",
+		"prompt_chaining":          "PC",
+		"persona":                  "Prs",
+		"multi-agent":              "MA",
+		"multi_agent":              "MA",
+		"consensus-building":       "ConsB",
+		"consensus_building":       "ConsB",
+		"hierarchical":             "HD",  // As requested
+		"hierarchical_decomposition": "HD",
+	}
+	
+	// Normalize the technique name to lowercase
+	normalized := strings.ToLower(strings.TrimSpace(technique))
+	
+	if abbrev, ok := abbrevs[normalized]; ok {
+		return abbrev
+	}
+	
+	// If not found, return empty string to skip unknown techniques
+	return ""
+}
+
+// getColoredTechniqueAbbrev returns a colored version of the technique abbreviation
+func getColoredTechniqueAbbrev(abbrev string, t theme.Theme) string {
+	// Define color mappings for different technique categories
+	// Using theme colors for consistency
+	var style lipgloss.Style
+	
+	switch abbrev {
+	// Reasoning techniques - Blue/Cyan tones
+	case "CoT", "ToT", "PAL":
+		style = lipgloss.NewStyle().Foreground(t.Info())
+	
+	// Generation techniques - Green tones
+	case "FS", "Prs", "GK":
+		style = lipgloss.NewStyle().Foreground(t.Success())
+	
+	// Multi-agent/Coordination - Purple/Magenta tones
+	case "MA", "ConsB", "HD":
+		style = lipgloss.NewStyle().Foreground(t.Secondary())
+	
+	// Optimization techniques - Yellow/Gold tones
+	case "IR", "Rfx", "SC":
+		style = lipgloss.NewStyle().Foreground(t.Warning())
+	
+	// Advanced techniques - Orange/Red tones
+	case "ReAct", "CAI", "MetaP":
+		style = lipgloss.NewStyle().Foreground(t.Error())
+	
+	// Problem-solving techniques - Teal tones
+	case "LtM", "SB", "RD":
+		style = lipgloss.NewStyle().Foreground(t.Accent())
+	
+	// Interactive techniques - Pink tones
+	case "SM", "MP", "RP", "PS":
+		style = lipgloss.NewStyle().Foreground(t.Primary())
+	
+	// Default for others
+	default:
+		style = lipgloss.NewStyle().Foreground(t.TextMuted())
+	}
+	
+	// Make it slightly bold for better visibility
+	return style.Bold(true).Render(abbrev)
 }
 
 // renderMCPCompact creates a compact display for MCP tool calls

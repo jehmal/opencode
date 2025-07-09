@@ -6,8 +6,8 @@ export namespace Identifier {
     session: "ses",
     message: "msg",
     user: "usr",
+    checkpoint: "chk",
   } as const
-
   export function schema(prefix: keyof typeof prefixes) {
     return z.string().startsWith(prefixes[prefix])
   }

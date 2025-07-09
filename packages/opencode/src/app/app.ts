@@ -54,10 +54,12 @@ export namespace App {
     )
     log.info("git", { git })
 
+    // Always use a unified storage location for DGMO sessions
+    // This ensures sessions are accessible regardless of where the app is launched
     const data = path.join(
       Global.Path.data,
       "project",
-      git ? directory(git) : "global",
+      "unified", // Always use "unified" instead of directory-specific paths
     )
     const stateFile = Bun.file(path.join(data, APP_JSON))
     const state = (await stateFile.json().catch(() => ({}))) as {
@@ -141,13 +143,5 @@ export namespace App {
         initialized: Date.now(),
       }),
     )
-  }
-
-  function directory(input: string): string {
-    return input
-      .split(path.sep)
-      .filter(Boolean)
-      .join("-")
-      .replace(/[^A-Za-z0-9_]/g, "-")
   }
 }

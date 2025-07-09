@@ -1,0 +1,87 @@
+# Instructions for Next New Session - 2025-07-06T11:20:47.053Z Agent
+
+You are continuing the implementation of Continue work on: New Session - 2025-07-06T11:20:47.053Z. The project is 10% complete with significant progress made. Your task is to complete the remaining implementation using advanced prompting techniques and vector memory integration.
+
+## Project Context
+- **Working Directory**: /mnt/c/Users/jehma/Desktop/AI/DGMSTT/opencode/packages/opencode
+- **Current Phase**: Implementation and optimization
+- **Architecture**: Vector memory + MCP servers + advanced prompting
+- **Completion Status**: 10% complete
+
+## Memory Search Commands (Chain of Thought Context Recovery)
+First, retrieve the current project state and patterns using these optimized queries:
+
+1. Search: "New Session - 2025-07-06T11:20:47.053Z project snapshot 2025-07"
+2. Search: "software_development implementation patterns Continue work on: New Session - 2025-07-06T11:20:47.053Z"
+3. Search: "software_development success patterns best practices"
+4. Search: "software_development error solutions debugging"
+5. Search: "New Session - 2025-07-06T11:20:47.053Z architecture decisions constraints"
+
+## Completed Components (DO NOT RECREATE)
+
+
+## Critical Files to Reference
+
+
+## Required Tasks (USE 0 SUB-AGENTS IN PARALLEL)
+
+
+
+## Integration Requirements
+- Maintain backward compatibility with existing systems
+- Follow established architectural patterns
+- Integrate with vector memory storage system
+- Use MCP servers for enhanced capabilities
+- Apply prompting techniques for optimization
+
+## Technical Constraints
+
+
+## Success Criteria (Iteratively Refined)
+
+Core Success Metrics:
+
+Measurable Validation:
+- All tests pass without errors
+- Performance benchmarks meet requirements
+- Code quality standards maintained
+- Documentation updated and accurate
+
+Automated Verification:
+- CI/CD pipeline validates changes
+- Integration tests confirm compatibility
+- Memory storage validates project state
+
+
+
+## Testing Approach (Iterative Validation)
+
+
+## Reflexion Insights & Learning
+
+What We've Accomplished:
+
+Lessons Learned:
+Self-Reflection for Next Agent:
+- Build upon the 10% completion achieved
+- Apply proven patterns from completed components
+- Use iterative refinement for complex implementations
+- Leverage vector memory for context preservation
+
+
+
+## Important Notes
+- **Chain of Thought**: Use step-by-step reasoning for complex implementations
+- **Multi-Agent Coordination**: Leverage parallel sub-agents for efficiency
+- **Reflexion**: Learn from previous patterns and apply proven solutions
+- **Iterative Refinement**: Progressively improve outputs through multiple passes
+- **Vector Memory**: Store all insights and patterns for future reference
+
+## Next Steps
+1. Begin with memory searches to restore full context
+2. Launch sub-agents in parallel for maximum efficiency
+3. Apply prompting techniques throughout implementation
+4. Store results in vector memory for future handoffs
+5. Validate all success criteria before completion
+
+Start by searching memory for the mentioned queries to understand the current state, then launch your sub-agents to complete the implementation using the advanced prompting techniques outlined above.

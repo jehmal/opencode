@@ -144,6 +144,7 @@ func (m *messagesComponent) renderView() {
 			}
 
 		case opencode.MessageRoleAssistant:
+
 			for i, p := range message.Parts {
 				switch part := p.AsUnion().(type) {
 				case opencode.TextPart:
@@ -173,7 +174,7 @@ func (m *messagesComponent) renderView() {
 							content = renderText(
 								message,
 								p.Text,
-								message.Metadata.Assistant.ModelID,
+								message.Metadata.Assistant.ModelID, // Pass full modelID with techniques
 								m.showToolDetails,
 								width,
 								align,
@@ -185,7 +186,7 @@ func (m *messagesComponent) renderView() {
 						content = renderText(
 							message,
 							p.Text,
-							message.Metadata.Assistant.ModelID,
+							message.Metadata.Assistant.ModelID, // Pass full modelID with techniques
 							m.showToolDetails,
 							width,
 							align,

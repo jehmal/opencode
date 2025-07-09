@@ -50,12 +50,10 @@ export const TuiCommand = cmd({
             taskEventServer.stop()
           }
         }
-        const goPath =
-          Bun.which("go", { PATH: process.env["PATH"] }) || "/usr/bin/go"
-        let cmd = [goPath, "run", "./main.go"]
-        let cwd = Bun.fileURLToPath(
-          new URL("../../../../tui/cmd/dgmo", import.meta.url),
-        )
+        let cmd: string[]
+        let cwd = process.cwd()
+        
+        // First, check if we have embedded files (production build)
         if (Bun.embeddedFiles.length > 0) {
           const blob = Bun.embeddedFiles[0] as File
           let binaryName = blob.name
@@ -68,8 +66,29 @@ export const TuiCommand = cmd({
             await Bun.write(file, blob, { mode: 0o755 })
             await fs.chmod(binary, 0o755)
           }
-          cwd = process.cwd()
           cmd = [binary]
+        } else {
+          // Development mode: check for compiled binary first
+          const tuiDir = Bun.fileURLToPath(
+            new URL("../../../../tui", import.meta.url),
+          )
+          const binaryName = process.platform === "win32" ? "dgmo.exe" : "dgmo"
+          const compiledBinary = path.join(tuiDir, binaryName)
+          
+          try {
+            await fs.access(compiledBinary, fs.constants.X_OK)
+            // Binary exists and is executable
+            cmd = [compiledBinary]
+          } catch {
+            // Binary doesn't exist or isn't executable, fall back to go run
+            const goPath =
+              Bun.which("go", { PATH: process.env["PATH"] }) || "/usr/bin/go"
+            const goCmdDir = Bun.fileURLToPath(
+              new URL("../../../../tui/cmd/dgmo", import.meta.url),
+            )
+            cmd = [goPath, "run", "./main.go"]
+            cwd = goCmdDir
+          }
         }
         const proc = Bun.spawn({
           cmd: [...cmd, ...process.argv.slice(2)],

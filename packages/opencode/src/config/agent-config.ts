@@ -105,6 +105,14 @@ export namespace AgentConfig {
     toolName: string,
     parentId?: string,
   ): Promise<boolean> {
+    // RECURSION PREVENTION: Block task tool for sub-agents to prevent infinite recursion
+    if (toolName === "task" && isSubAgentSession(sessionId, parentId)) {
+      Debug.log(
+        `[AGENT-CONFIG] Blocking task tool for sub-agent session ${sessionId} (parent: ${parentId})`,
+      )
+      return false
+    }
+
     // MCP tools are always allowed (they start with server prefix)
     if (toolName.includes("_") && !ALL_TOOLS.includes(toolName)) {
       return true // Likely an MCP tool

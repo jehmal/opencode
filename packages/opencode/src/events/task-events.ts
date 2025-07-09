@@ -22,6 +22,9 @@ export const TaskProgressEvent = Bus.event(
     message: z.string().optional(),
     timestamp: z.number(),
     startTime: z.number().optional(),
+    phase: z.enum(["prompt-generation", "context-gathering", "processing"]).optional(),
+    currentTool: z.string().optional(),
+    toolDescription: z.string().optional(),
   }),
 )
 

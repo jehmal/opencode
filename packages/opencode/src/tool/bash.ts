@@ -1,7 +1,7 @@
 import { z } from "zod"
-import { Tool } from "./tool"
-import DESCRIPTION from "./bash.txt"
 import { App } from "../app/app"
+import DESCRIPTION from "./bash.txt"
+import { Tool } from "./tool"
 
 const MAX_OUTPUT_LENGTH = 30000
 const BANNED_COMMANDS = [
@@ -43,6 +43,7 @@ export const BashTool = Tool.define({
         "Clear, concise description of what this command does in 5-10 words. Examples:\nInput: ls\nOutput: Lists files in current directory\n\nInput: git status\nOutput: Shows working tree status\n\nInput: npm install\nOutput: Installs package dependencies\n\nInput: mkdir foo\nOutput: Creates directory 'foo'",
       ),
   }),
+  required: ["command", "description"],
   async execute(params, ctx) {
     const timeout = Math.min(params.timeout ?? DEFAULT_TIMEOUT, MAX_TIMEOUT)
     if (BANNED_COMMANDS.some((item) => params.command.startsWith(item)))

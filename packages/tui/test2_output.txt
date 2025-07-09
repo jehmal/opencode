@@ -1,0 +1,24 @@
+jehma@BigBoi:/mnt/c/Users/jehma/Desktop/AI/DGMSTT/opencode$ cd /mnt/c/Users/jehm
+a/Desktop/AI/DGMSTT/opencode/packages/tui && ./cmd/dgmo/dgmoC-m
+-bash: ./cmd/dgmo/dgmoC-m: No such file or directory
+jehma@BigBoi:/mnt/c/Users/jehma/Desktop/AI/DGMSTT/opencode/packages/tui$ Help me
+ implement a REST API for user management with authenticationC-m
+/continueC-m
+/newC-m
+Debug the WebSocket connection issues in the chat applicationC-m
+/continueC-m
+Command 'Help' not found, did you mean:
+  command 'yelp' from deb yelp (42.2-1)
+  command 'delp' from deb fp-utils-3.2.2 (3.2.2+dfsg-28)
+Try: sudo apt install <deb name>
+jehma@BigBoi:/mnt/c/Users/jehma/Desktop/AI/DGMSTT/opencode/packages/tui$ /contin
+ueC-m
+-bash: /continueC-m: No such file or directory
+jehma@BigBoi:/mnt/c/Users/jehma/Desktop/AI/DGMSTT/opencode/packages/tui$ /newC-m
+-bash: /newC-m: No such file or directory
+jehma@BigBoi:/mnt/c/Users/jehma/Desktop/AI/DGMSTT/opencode/packages/tui$ Debug t
+he WebSocket connection issues in the chat applicationC-m
+
+
+
+

@@ -379,7 +379,14 @@ func NewSubSessionDialog(app *app.App) SubSessionDialog {
 		modal.WithMaxHeight(height),
 	)
 
-	list := list.NewListComponent([]subSessionItem{}, 10, "No sub-sessions", true)
+	// Create more helpful empty message
+	emptyMsg := "No sub-sessions found.\n\n" +
+		"To create sub-sessions, use the task tool:\n" +
+		"Example: 'Create 3 agents to analyze this code'\n\n" +
+		"Or switch to a session that has sub-sessions\n" +
+		"using Ctrl+X L to list sessions."
+	
+	list := list.NewListComponent([]subSessionItem{}, 10, emptyMsg, true)
 	list.SetMaxWidth(width - 12)
 
 	dialog := &subSessionDialog{
@@ -435,7 +442,9 @@ func NewSubSessionDialog(app *app.App) SubSessionDialog {
 			dialog.subSessions = allSubSessions
 			items := dialog.buildTreeStructure(allSubSessions, currentSession.ID)
 			dialog.list.SetItems(items)
-
+		} else {
+			// Update title to indicate no sub-sessions found
+			dialog.modal.SetTitle("Sub-Sessions - None Found for Current Session")
 		}
 	}
 

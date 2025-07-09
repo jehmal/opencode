@@ -1,13 +1,16 @@
 # DGM Integration Package
 
-This package provides integration between OpenCode and DGM (Dynamic Graph Memory) through a TypeScript-Python bridge.
+This package provides the integration layer between DGMO (OpenCode) and DGM (Dynamic Graph Memory) through a TypeScript-Python bridge for Phase 1 integration.
 
 ## Features
 
-- **Performance Tracking**: Monitor and report performance metrics for DGM operations
-- **Python Bridge**: Spawn and manage Python subprocess for DGM communication
+- **JSON-RPC Communication**: Full JSON-RPC 2.0 client implementation with @open-rpc/client
+- **Type Safety**: Zod schemas for runtime validation and type inference
+- **Process Management**: Automatic Python subprocess lifecycle management
+- **Error Handling**: Comprehensive error handling with configurable retries
+- **Performance Tracking**: Built-in metrics and performance monitoring
 - **Tool Synchronization**: Sync tool definitions between OpenCode and DGM
-- **JSON-RPC Protocol**: Clean communication protocol between TypeScript and Python
+- **TypeScript Support**: Full TypeScript support with strict mode enabled
 
 ## Architecture
 
@@ -26,32 +29,34 @@ DGM Core
 ## Usage
 
 ```typescript
-import { DGMBridge } from '@opencode/dgm-integration';
-import { PerformanceTracker } from '@opencode/dgm-integration/performance';
+import { DGMBridge } from "@opencode/dgm-integration"
+import { PerformanceTracker } from "@opencode/dgm-integration/performance"
 
 // Initialize bridge
-const bridge = new DGMBridge();
-await bridge.initialize();
+const bridge = new DGMBridge()
+await bridge.initialize()
 
 // Track performance
-const tracker = new PerformanceTracker();
-const metric = tracker.startOperation('memory-search');
+const tracker = new PerformanceTracker()
+const metric = tracker.startOperation("memory-search")
 
 // Use DGM
-const result = await bridge.searchMemory('TypeScript performance tips');
-metric.end();
+const result = await bridge.searchMemory("TypeScript performance tips")
+metric.end()
 
 // Get performance report
-const report = tracker.getReport();
+const report = tracker.getReport()
 ```
 
 ## Python Requirements
 
 The Python side requires:
+
 - Python 3.8+
 - Dependencies listed in `python/requirements.txt`
 
 Install with:
+
 ```bash
 pip install -r python/requirements.txt
 ```

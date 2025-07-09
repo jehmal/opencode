@@ -227,12 +227,157 @@ export namespace Config {
         .optional()
         .default("read-only")
         .describe("Default mode for sub-agents (read-only or all-tools)"),
+      dgm: z
+        .object({
+          enabled: z
+            .boolean()
+            .optional()
+            .default(false)
+            .describe("Enable DGM integration"),
+          pythonPath: z
+            .string()
+            .optional()
+            .default("python3")
+            .describe("Path to Python executable"),
+          dgmPath: z
+            .string()
+            .optional()
+            .describe("Path to DGM module (defaults to auto-discovery)"),
+          evolutionSettings: z
+            .object({
+              autoApprove: z
+                .boolean()
+                .optional()
+                .default(false)
+                .describe("Automatically approve evolution proposals"),
+              maxConcurrentEvolutions: z
+                .number()
+                .optional()
+                .default(5)
+                .describe("Maximum number of concurrent evolutions"),
+              performanceThreshold: z
+                .number()
+                .optional()
+                .default(0.8)
+                .describe(
+                  "Performance threshold for evolution acceptance (0-1)",
+                ),
+            })
+            .optional()
+            .describe("Evolution-specific settings"),
+          communication: z
+            .object({
+              timeout: z
+                .number()
+                .optional()
+                .default(30000)
+                .describe("Timeout for DGM operations in milliseconds"),
+              retryAttempts: z
+                .number()
+                .optional()
+                .default(3)
+                .describe("Maximum retry attempts for failed operations"),
+              healthCheckInterval: z
+                .number()
+                .optional()
+                .default(60000)
+                .describe("Health check interval in milliseconds"),
+            })
+            .optional()
+            .describe("Communication and networking settings"),
+          // Legacy fields for backward compatibility
+          timeout: z
+            .number()
+            .optional()
+            .default(30000)
+            .describe(
+              "Timeout for DGM operations in milliseconds (deprecated - use communication.timeout)",
+            ),
+          maxRetries: z
+            .number()
+            .optional()
+            .default(3)
+            .describe(
+              "Maximum retry attempts for failed operations (deprecated - use communication.retryAttempts)",
+            ),
+          healthCheckInterval: z
+            .number()
+            .optional()
+            .default(60000)
+            .describe(
+              "Health check interval in milliseconds (deprecated - use communication.healthCheckInterval)",
+            ),
+        })
+        .optional()
+        .describe("DGM (Dynamic Graph Memory) integration configuration"),
+      prompting: z
+        .object({
+          ui: z
+            .object({
+              enabled: z
+                .boolean()
+                .optional()
+                .default(true)
+                .describe("Enable prompting techniques UI"),
+              showConfidence: z
+                .boolean()
+                .optional()
+                .default(true)
+                .describe("Show confidence scores in prompting UI"),
+              showPerformance: z
+                .boolean()
+                .optional()
+                .default(false)
+                .describe("Show performance metrics in prompting UI"),
+              defaultPanelOpen: z
+                .boolean()
+                .optional()
+                .default(false)
+                .describe("Open prompting panel by default"),
+            })
+            .optional()
+            .describe("Prompting UI configuration"),
+        })
+        .optional()
+        .describe("Prompting techniques configuration"),
+      retry: z
+        .object({
+          maxRetries: z
+            .number()
+            .optional()
+            .default(10)
+            .describe("Maximum number of retry attempts for API calls"),
+          initialDelay: z
+            .number()
+            .optional()
+            .default(1000)
+            .describe("Initial delay in milliseconds before first retry"),
+          maxDelay: z
+            .number()
+            .optional()
+            .default(60000)
+            .describe("Maximum delay in milliseconds between retries"),
+          backoffMultiplier: z
+            .number()
+            .optional()
+            .default(2)
+            .describe("Backoff multiplier for exponential backoff"),
+          jitterFactor: z
+            .number()
+            .min(0)
+            .max(1)
+            .optional()
+            .default(0.1)
+            .describe("Jitter factor (0-1) to randomize delays"),
+        })
+        .optional()
+        .describe("Retry configuration for API calls"),
     })
     .strict()
     .openapi({
       ref: "Config",
     })
-  export type Info = z.output<typeof Info>
+  export type Info = z.infer<typeof Info>
 
   export const global = lazy(async () => {
     let result = await load(path.join(Global.Path.config, "config.json"))

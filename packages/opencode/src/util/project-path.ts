@@ -1,12 +1,11 @@
 import { Debug } from "./debug"
 import { execSync } from "child_process"
-import path from "path"
 import fs from "fs"
 
 export namespace ProjectPath {
   // Cache the result for consistency
   let cachedProjectPath: string | null = null
-  
+
   /**
    * Find git root directory from the given path
    */
@@ -15,9 +14,9 @@ export namespace ProjectPath {
       const result = execSync("git rev-parse --show-toplevel", {
         cwd: startPath,
         encoding: "utf8",
-        stdio: ["pipe", "pipe", "ignore"] // Ignore stderr
+        stdio: ["pipe", "pipe", "ignore"], // Ignore stderr
       }).trim()
-      
+
       if (result && fs.existsSync(result)) {
         Debug.log("[PROJECT-PATH] Found git root:", result)
         return result
@@ -28,7 +27,7 @@ export namespace ProjectPath {
     }
     return null
   }
-  
+
   /**
    * Get consistent project path - always returns the same path during a session
    */
@@ -36,7 +35,7 @@ export namespace ProjectPath {
     if (cachedProjectPath) {
       return cachedProjectPath
     }
-    
+
     // Try git root first
     const gitRoot = findGitRoot(process.cwd())
     if (gitRoot) {
@@ -44,13 +43,13 @@ export namespace ProjectPath {
       Debug.log("[PROJECT-PATH] Using git root as project path:", gitRoot)
       return gitRoot
     }
-    
+
     // Fallback to cwd
     cachedProjectPath = process.cwd()
     Debug.log("[PROJECT-PATH] Using cwd as project path:", cachedProjectPath)
     return cachedProjectPath
   }
-  
+
   /**
    * Reset the cached path (useful for testing)
    */

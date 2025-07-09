@@ -15,6 +15,7 @@ type TaskInfo struct {
 	StartTime   time.Time
 	Duration    time.Duration
 	Error       string
+	AgentNumber int32 // Sequential agent number for this session
 }
 
 // TaskStatus represents the status of a task
@@ -34,21 +35,26 @@ type TaskStartedMsg struct {
 
 // TaskProgressMsg is sent when a task makes progress
 type TaskProgressMsg struct {
-	TaskID   string
-	Progress int
-	Message  string
+	SessionID   string
+	TaskID      string
+	Progress    int
+	Message     string
+	Phase       string
+	CurrentTool string
 }
 
 // TaskCompletedMsg is sent when a task completes
 type TaskCompletedMsg struct {
-	TaskID   string
-	Duration time.Duration
-	Success  bool
-	Summary  string
+	SessionID string
+	TaskID    string
+	Duration  time.Duration
+	Success   bool
+	Summary   string
 }
 
 // TaskFailedMsg is sent when a task fails
 type TaskFailedMsg struct {
+	SessionID   string
 	TaskID      string
 	Error       string
 	Recoverable bool

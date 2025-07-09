@@ -972,6 +972,9 @@
                         "successCriteria",
                         "testingApproach"
                       ]
+                    },
+                    "taskId": {
+                      "type": "string"
                     }
                   },
                   "required": [
@@ -1146,6 +1149,412 @@
           }
         }
       }
+    },
+    "/events/diagnostics": {
+      "get": {
+        "responses": {
+          "200": {
+            "description": "Event diagnostics data",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "eventCounts": {
+                      "type": "object",
+                      "properties": {
+                        "started": {
+                          "type": "number"
+                        },
+                        "progress": {
+                          "type": "number"
+                        },
+                        "completed": {
+                          "type": "number"
+                        },
+                        "failed": {
+                          "type": "number"
+                        }
+                      },
+                      "required": [
+                        "started",
+                        "progress",
+                        "completed",
+                        "failed"
+                      ]
+                    },
+                    "lastEvents": {
+                      "type": "object",
+                      "additionalProperties": {}
+                    },
+                    "websocketClients": {
+                      "type": "number"
+                    }
+                  },
+                  "required": [
+                    "eventCounts",
+                    "lastEvents",
+                    "websocketClients"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "operationId": "getEventsDiagnostics",
+        "parameters": [],
+        "description": "Get task event diagnostics information"
+      }
+    },
+    "/events/test": {
+      "post": {
+        "responses": {
+          "200": {
+            "description": "Test completed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "message"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "operationId": "postEventsTest",
+        "parameters": [],
+        "description": "Test task event flow"
+      }
+    },
+    "/prompting/technique/selected": {
+      "post": {
+        "responses": {
+          "200": {
+            "description": "Event emitted successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "boolean"
+                }
+              }
+            }
+          }
+        },
+        "operationId": "postPromptingTechniqueSelected",
+        "parameters": [],
+        "description": "Emit prompting technique selected event",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "sessionID": {
+                    "type": "string"
+                  },
+                  "taskID": {
+                    "type": "string"
+                  },
+                  "techniques": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "name": {
+                          "type": "string"
+                        },
+                        "category": {
+                          "type": "string"
+                        },
+                        "confidence": {
+                          "type": "number",
+                          "minimum": 0,
+                          "maximum": 1
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "name",
+                        "confidence"
+                      ]
+                    }
+                  },
+                  "selectionMode": {
+                    "type": "string",
+                    "enum": [
+                      "auto",
+                      "manual"
+                    ]
+                  },
+                  "context": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "sessionID",
+                  "techniques",
+                  "selectionMode"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/prompting/technique/applied": {
+      "post": {
+        "responses": {
+          "200": {
+            "description": "Event emitted successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "boolean"
+                }
+              }
+            }
+          }
+        },
+        "operationId": "postPromptingTechniqueApplied",
+        "parameters": [],
+        "description": "Emit prompting technique applied event",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "sessionID": {
+                    "type": "string"
+                  },
+                  "taskID": {
+                    "type": "string"
+                  },
+                  "techniqueID": {
+                    "type": "string"
+                  },
+                  "techniqueName": {
+                    "type": "string"
+                  },
+                  "originalPrompt": {
+                    "type": "string"
+                  },
+                  "enhancedPrompt": {
+                    "type": "string"
+                  },
+                  "enhancementDetails": {
+                    "type": "object",
+                    "properties": {
+                      "addedElements": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      },
+                      "structureChanges": {
+                        "type": "string"
+                      },
+                      "confidenceScore": {
+                        "type": "number",
+                        "minimum": 0,
+                        "maximum": 1
+                      }
+                    },
+                    "required": [
+                      "confidenceScore"
+                    ]
+                  }
+                },
+                "required": [
+                  "sessionID",
+                  "techniqueID",
+                  "techniqueName",
+                  "originalPrompt",
+                  "enhancedPrompt"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/prompting/technique/performance": {
+      "post": {
+        "responses": {
+          "200": {
+            "description": "Event emitted successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "boolean"
+                }
+              }
+            }
+          }
+        },
+        "operationId": "postPromptingTechniquePerformance",
+        "parameters": [],
+        "description": "Emit prompting technique performance event",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "sessionID": {
+                    "type": "string"
+                  },
+                  "techniqueID": {
+                    "type": "string"
+                  },
+                  "techniqueName": {
+                    "type": "string"
+                  },
+                  "metrics": {
+                    "type": "object",
+                    "properties": {
+                      "successRate": {
+                        "type": "number",
+                        "minimum": 0,
+                        "maximum": 1
+                      },
+                      "averageConfidence": {
+                        "type": "number",
+                        "minimum": 0,
+                        "maximum": 1
+                      },
+                      "usageCount": {
+                        "type": "integer",
+                        "minimum": 0
+                      },
+                      "lastUsed": {
+                        "type": "number"
+                      },
+                      "taskTypes": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      },
+                      "averageResponseTime": {
+                        "type": "number"
+                      }
+                    },
+                    "required": [
+                      "successRate",
+                      "averageConfidence",
+                      "usageCount",
+                      "lastUsed"
+                    ]
+                  }
+                },
+                "required": [
+                  "sessionID",
+                  "techniqueID",
+                  "techniqueName",
+                  "metrics"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/prompting/technique/evaluation": {
+      "post": {
+        "responses": {
+          "200": {
+            "description": "Event emitted successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "boolean"
+                }
+              }
+            }
+          }
+        },
+        "operationId": "postPromptingTechniqueEvaluation",
+        "parameters": [],
+        "description": "Emit prompting technique evaluation event",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "sessionID": {
+                    "type": "string"
+                  },
+                  "taskID": {
+                    "type": "string"
+                  },
+                  "techniqueID": {
+                    "type": "string"
+                  },
+                  "techniqueName": {
+                    "type": "string"
+                  },
+                  "evaluation": {
+                    "type": "object",
+                    "properties": {
+                      "effectiveness": {
+                        "type": "number",
+                        "minimum": 0,
+                        "maximum": 1
+                      },
+                      "clarity": {
+                        "type": "number",
+                        "minimum": 0,
+                        "maximum": 1
+                      },
+                      "completeness": {
+                        "type": "number",
+                        "minimum": 0,
+                        "maximum": 1
+                      },
+                      "overallScore": {
+                        "type": "number",
+                        "minimum": 0,
+                        "maximum": 1
+                      },
+                      "feedback": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "effectiveness",
+                      "clarity",
+                      "completeness",
+                      "overallScore"
+                    ]
+                  }
+                },
+                "required": [
+                  "sessionID",
+                  "techniqueID",
+                  "techniqueName",
+                  "evaluation"
+                ]
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -1184,6 +1593,30 @@
           },
           {
             "$ref": "#/components/schemas/Event.session.error"
+          },
+          {
+            "$ref": "#/components/schemas/Event.task.started"
+          },
+          {
+            "$ref": "#/components/schemas/Event.task.progress"
+          },
+          {
+            "$ref": "#/components/schemas/Event.task.completed"
+          },
+          {
+            "$ref": "#/components/schemas/Event.task.failed"
+          },
+          {
+            "$ref": "#/components/schemas/Event.prompting.technique.selected"
+          },
+          {
+            "$ref": "#/components/schemas/Event.prompting.technique.applied"
+          },
+          {
+            "$ref": "#/components/schemas/Event.prompting.technique.performance"
+          },
+          {
+            "$ref": "#/components/schemas/Event.prompting.technique.evaluation"
           }
         ],
         "discriminator": {
@@ -1199,7 +1632,15 @@
             "session.updated": "#/components/schemas/Event.session.updated",
             "session.deleted": "#/components/schemas/Event.session.deleted",
             "session.idle": "#/components/schemas/Event.session.idle",
-            "session.error": "#/components/schemas/Event.session.error"
+            "session.error": "#/components/schemas/Event.session.error",
+            "task.started": "#/components/schemas/Event.task.started",
+            "task.progress": "#/components/schemas/Event.task.progress",
+            "task.completed": "#/components/schemas/Event.task.completed",
+            "task.failed": "#/components/schemas/Event.task.failed",
+            "prompting.technique.selected": "#/components/schemas/Event.prompting.technique.selected",
+            "prompting.technique.applied": "#/components/schemas/Event.prompting.technique.applied",
+            "prompting.technique.performance": "#/components/schemas/Event.prompting.technique.performance",
+            "prompting.technique.evaluation": "#/components/schemas/Event.prompting.technique.evaluation"
           }
         }
       },
@@ -1709,6 +2150,36 @@
                   "reasoning",
                   "cache"
                 ]
+              },
+              "prompting": {
+                "type": "object",
+                "properties": {
+                  "techniques": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "originalPrompt": {
+                    "type": "string"
+                  },
+                  "enhancedPrompt": {
+                    "type": "string"
+                  },
+                  "selectionMode": {
+                    "type": "string"
+                  },
+                  "confidence": {
+                    "type": "number"
+                  }
+                },
+                "required": [
+                  "techniques",
+                  "originalPrompt",
+                  "enhancedPrompt",
+                  "selectionMode",
+                  "confidence"
+                ]
               }
             },
             "required": [
@@ -2082,6 +2553,474 @@
           "properties"
         ]
       },
+      "Event.task.started": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "task.started"
+          },
+          "properties": {
+            "type": "object",
+            "properties": {
+              "sessionID": {
+                "type": "string"
+              },
+              "taskID": {
+                "type": "string"
+              },
+              "agentName": {
+                "type": "string"
+              },
+              "taskDescription": {
+                "type": "string"
+              },
+              "timestamp": {
+                "type": "number"
+              }
+            },
+            "required": [
+              "sessionID",
+              "taskID",
+              "agentName",
+              "taskDescription",
+              "timestamp"
+            ]
+          }
+        },
+        "required": [
+          "type",
+          "properties"
+        ]
+      },
+      "Event.task.progress": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "task.progress"
+          },
+          "properties": {
+            "type": "object",
+            "properties": {
+              "sessionID": {
+                "type": "string"
+              },
+              "taskID": {
+                "type": "string"
+              },
+              "progress": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 100
+              },
+              "message": {
+                "type": "string"
+              },
+              "timestamp": {
+                "type": "number"
+              },
+              "startTime": {
+                "type": "number"
+              },
+              "phase": {
+                "type": "string",
+                "enum": [
+                  "prompt-generation",
+                  "context-gathering",
+                  "processing"
+                ]
+              },
+              "currentTool": {
+                "type": "string"
+              },
+              "toolDescription": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "sessionID",
+              "taskID",
+              "progress",
+              "timestamp"
+            ]
+          }
+        },
+        "required": [
+          "type",
+          "properties"
+        ]
+      },
+      "Event.task.completed": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "task.completed"
+          },
+          "properties": {
+            "type": "object",
+            "properties": {
+              "sessionID": {
+                "type": "string"
+              },
+              "taskID": {
+                "type": "string"
+              },
+              "duration": {
+                "type": "number"
+              },
+              "success": {
+                "type": "boolean"
+              },
+              "summary": {
+                "type": "string"
+              },
+              "timestamp": {
+                "type": "number"
+              }
+            },
+            "required": [
+              "sessionID",
+              "taskID",
+              "duration",
+              "success",
+              "timestamp"
+            ]
+          }
+        },
+        "required": [
+          "type",
+          "properties"
+        ]
+      },
+      "Event.task.failed": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "task.failed"
+          },
+          "properties": {
+            "type": "object",
+            "properties": {
+              "sessionID": {
+                "type": "string"
+              },
+              "taskID": {
+                "type": "string"
+              },
+              "error": {
+                "type": "string"
+              },
+              "recoverable": {
+                "type": "boolean"
+              },
+              "timestamp": {
+                "type": "number"
+              }
+            },
+            "required": [
+              "sessionID",
+              "taskID",
+              "error",
+              "recoverable",
+              "timestamp"
+            ]
+          }
+        },
+        "required": [
+          "type",
+          "properties"
+        ]
+      },
+      "Event.prompting.technique.selected": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "prompting.technique.selected"
+          },
+          "properties": {
+            "type": "object",
+            "properties": {
+              "sessionID": {
+                "type": "string"
+              },
+              "taskID": {
+                "type": "string"
+              },
+              "techniques": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "category": {
+                      "type": "string"
+                    },
+                    "confidence": {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 1
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "name",
+                    "confidence"
+                  ]
+                }
+              },
+              "selectionMode": {
+                "type": "string",
+                "enum": [
+                  "auto",
+                  "manual"
+                ]
+              },
+              "context": {
+                "type": "string"
+              },
+              "timestamp": {
+                "type": "number"
+              }
+            },
+            "required": [
+              "sessionID",
+              "techniques",
+              "selectionMode",
+              "timestamp"
+            ]
+          }
+        },
+        "required": [
+          "type",
+          "properties"
+        ]
+      },
+      "Event.prompting.technique.applied": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "prompting.technique.applied"
+          },
+          "properties": {
+            "type": "object",
+            "properties": {
+              "sessionID": {
+                "type": "string"
+              },
+              "taskID": {
+                "type": "string"
+              },
+              "techniqueID": {
+                "type": "string"
+              },
+              "techniqueName": {
+                "type": "string"
+              },
+              "originalPrompt": {
+                "type": "string"
+              },
+              "enhancedPrompt": {
+                "type": "string"
+              },
+              "enhancementDetails": {
+                "type": "object",
+                "properties": {
+                  "addedElements": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "structureChanges": {
+                    "type": "string"
+                  },
+                  "confidenceScore": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
+                  }
+                },
+                "required": [
+                  "confidenceScore"
+                ]
+              },
+              "timestamp": {
+                "type": "number"
+              }
+            },
+            "required": [
+              "sessionID",
+              "techniqueID",
+              "techniqueName",
+              "originalPrompt",
+              "enhancedPrompt",
+              "timestamp"
+            ]
+          }
+        },
+        "required": [
+          "type",
+          "properties"
+        ]
+      },
+      "Event.prompting.technique.performance": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "prompting.technique.performance"
+          },
+          "properties": {
+            "type": "object",
+            "properties": {
+              "sessionID": {
+                "type": "string"
+              },
+              "techniqueID": {
+                "type": "string"
+              },
+              "techniqueName": {
+                "type": "string"
+              },
+              "metrics": {
+                "type": "object",
+                "properties": {
+                  "successRate": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
+                  },
+                  "averageConfidence": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
+                  },
+                  "usageCount": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "lastUsed": {
+                    "type": "number"
+                  },
+                  "taskTypes": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "averageResponseTime": {
+                    "type": "number"
+                  }
+                },
+                "required": [
+                  "successRate",
+                  "averageConfidence",
+                  "usageCount",
+                  "lastUsed"
+                ]
+              },
+              "timestamp": {
+                "type": "number"
+              }
+            },
+            "required": [
+              "sessionID",
+              "techniqueID",
+              "techniqueName",
+              "metrics",
+              "timestamp"
+            ]
+          }
+        },
+        "required": [
+          "type",
+          "properties"
+        ]
+      },
+      "Event.prompting.technique.evaluation": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "prompting.technique.evaluation"
+          },
+          "properties": {
+            "type": "object",
+            "properties": {
+              "sessionID": {
+                "type": "string"
+              },
+              "taskID": {
+                "type": "string"
+              },
+              "techniqueID": {
+                "type": "string"
+              },
+              "techniqueName": {
+                "type": "string"
+              },
+              "evaluation": {
+                "type": "object",
+                "properties": {
+                  "effectiveness": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
+                  },
+                  "clarity": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
+                  },
+                  "completeness": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
+                  },
+                  "overallScore": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
+                  },
+                  "feedback": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "effectiveness",
+                  "clarity",
+                  "completeness",
+                  "overallScore"
+                ]
+              },
+              "timestamp": {
+                "type": "number"
+              }
+            },
+            "required": [
+              "sessionID",
+              "techniqueID",
+              "techniqueName",
+              "evaluation",
+              "timestamp"
+            ]
+          }
+        },
+        "required": [
+          "type",
+          "properties"
+        ]
+      },
       "App": {
         "type": "object",
         "properties": {
@@ -2389,6 +3328,138 @@
             ],
             "default": "read-only",
             "description": "Default mode for sub-agents (read-only or all-tools)"
+          },
+          "dgm": {
+            "type": "object",
+            "properties": {
+              "enabled": {
+                "type": "boolean",
+                "default": false,
+                "description": "Enable DGM integration"
+              },
+              "pythonPath": {
+                "type": "string",
+                "default": "python3",
+                "description": "Path to Python executable"
+              },
+              "dgmPath": {
+                "type": "string",
+                "description": "Path to DGM module (defaults to auto-discovery)"
+              },
+              "evolutionSettings": {
+                "type": "object",
+                "properties": {
+                  "autoApprove": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "Automatically approve evolution proposals"
+                  },
+                  "maxConcurrentEvolutions": {
+                    "type": "number",
+                    "default": 5,
+                    "description": "Maximum number of concurrent evolutions"
+                  },
+                  "performanceThreshold": {
+                    "type": "number",
+                    "default": 0.8,
+                    "description": "Performance threshold for evolution acceptance (0-1)"
+                  }
+                },
+                "required": [
+                  "autoApprove",
+                  "maxConcurrentEvolutions",
+                  "performanceThreshold"
+                ],
+                "description": "Evolution-specific settings"
+              },
+              "communication": {
+                "type": "object",
+                "properties": {
+                  "timeout": {
+                    "type": "number",
+                    "default": 30000,
+                    "description": "Timeout for DGM operations in milliseconds"
+                  },
+                  "retryAttempts": {
+                    "type": "number",
+                    "default": 3,
+                    "description": "Maximum retry attempts for failed operations"
+                  },
+                  "healthCheckInterval": {
+                    "type": "number",
+                    "default": 60000,
+                    "description": "Health check interval in milliseconds"
+                  }
+                },
+                "required": [
+                  "timeout",
+                  "retryAttempts",
+                  "healthCheckInterval"
+                ],
+                "description": "Communication and networking settings"
+              },
+              "timeout": {
+                "type": "number",
+                "default": 30000,
+                "description": "Timeout for DGM operations in milliseconds (deprecated - use communication.timeout)"
+              },
+              "maxRetries": {
+                "type": "number",
+                "default": 3,
+                "description": "Maximum retry attempts for failed operations (deprecated - use communication.retryAttempts)"
+              },
+              "healthCheckInterval": {
+                "type": "number",
+                "default": 60000,
+                "description": "Health check interval in milliseconds (deprecated - use communication.healthCheckInterval)"
+              }
+            },
+            "required": [
+              "enabled",
+              "pythonPath",
+              "timeout",
+              "maxRetries",
+              "healthCheckInterval"
+            ],
+            "description": "DGM (Dynamic Graph Memory) integration configuration"
+          },
+          "prompting": {
+            "type": "object",
+            "properties": {
+              "ui": {
+                "type": "object",
+                "properties": {
+                  "enabled": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "Enable prompting techniques UI"
+                  },
+                  "showConfidence": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "Show confidence scores in prompting UI"
+                  },
+                  "showPerformance": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "Show performance metrics in prompting UI"
+                  },
+                  "defaultPanelOpen": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "Open prompting panel by default"
+                  }
+                },
+                "required": [
+                  "enabled",
+                  "showConfidence",
+                  "showPerformance",
+                  "defaultPanelOpen"
+                ],
+                "description": "Prompting UI configuration"
+              }
+            },
+            "description": "Prompting techniques configuration"
           }
         },
         "required": [
