@@ -71,8 +71,55 @@ export const TaskTool = Tool.define({
 
     // Create a sub-session with the current session as parent
     const subSession = await Session.create(ctx.sessionID)
-    const msg = await Session.getMessage(ctx.sessionID, ctx.messageID)
-    const metadata = msg.metadata.assistant!
+
+    // Try to get model info from the current message, but fall back to parent session's last message
+    let metadata: any
+    let msg: any
+    try {
+      msg = await Session.getMessage(ctx.sessionID, ctx.messageID)
+      metadata = msg.metadata.assistant
+    } catch (e) {
+      Debug.log(
+        "[TASK] Could not get message metadata, using parent session's last assistant message",
+      )
+    }
+
+    // If we don't have metadata, get it from the parent session's messages
+    if (!metadata || !metadata.modelID || !metadata.providerID) {
+      const parentMessages = await Session.messages(ctx.sessionID)
+      const lastAssistantMsg = parentMessages
+        .reverse()
+        .find((m) => m.metadata.assistant)
+      if (lastAssistantMsg?.metadata.assistant) {
+        metadata = lastAssistantMsg.metadata.assistant
+      } else {
+        // If still no metadata, use default from config
+        const { Config } = await import("../config/config")
+        const cfg = await Config.get()
+
+        // Parse the model string if it exists
+        if (cfg.model) {
+          const [providerID, ...modelParts] = cfg.model.split("/")
+          metadata = {
+            modelID: modelParts.join("/"),
+            providerID: providerID,
+          }
+        } else {
+          // Ultimate fallback
+          metadata = {
+            modelID: "claude-3-5-sonnet-20241022",
+            providerID: "anthropic",
+          }
+        }
+      }
+    }
+
+    Debug.log("[TASK] Using model configuration:", {
+      modelID: metadata.modelID,
+      providerID: metadata.providerID,
+      source:
+        metadata === msg?.metadata?.assistant ? "current message" : "fallback",
+    })
 
     // Set the agent mode for this sub-session
     const mode = params.agentMode || "read-only"

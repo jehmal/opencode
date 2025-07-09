@@ -21,7 +21,7 @@ import { AuthCopilot } from "../auth/copilot"
 import { ModelsDev } from "./models"
 import { NamedError } from "../util/error"
 import { Auth } from "../auth"
-import { TaskTool } from "../tool/task"
+// TaskTool is imported dynamically to avoid circular dependency
 import { DiagnoseTool } from "../tool/diagnose"
 import { DGMSessionManager } from "../dgm/session-manager"
 export namespace Provider {
