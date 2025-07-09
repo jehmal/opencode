@@ -44,6 +44,9 @@ type App struct {
 
 	// Task tracking
 	TaskClient *TaskClient
+
+	// Checkpoint service
+	CheckpointService *CheckpointService
 }
 
 type SessionSelectedMsg = *opencode.Session
@@ -139,13 +142,14 @@ func New(
 	slog.Debug("Loaded config", "config", configInfo)
 
 	app := &App{
-		Info:      appInfo,
-		Version:   version,
-		StatePath: appStatePath,
-		Config:    configInfo,
-		Client:    httpClient,
-		State:     appState,
-		Commands:  commands.LoadFromConfig(configInfo),
+		Info:              appInfo,
+		Version:           version,
+		StatePath:         appStatePath,
+		Config:            configInfo,
+		Client:            httpClient,
+		State:             appState,
+		Commands:          commands.LoadFromConfig(configInfo),
+		CheckpointService: NewCheckpointService(),
 	}
 
 	// Initialize navigation state
