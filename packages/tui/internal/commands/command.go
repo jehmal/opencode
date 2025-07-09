@@ -162,6 +162,12 @@ func LoadFromConfig(config *opencode.Config) CommandRegistry {
 			Trigger:     "share",
 		},
 		{
+			Name:        SessionRevertCommand,
+			Description: "revert to checkpoint",
+			Keybindings: parseBindings("<leader>r"),
+			Trigger:     "revert",
+		},
+		{
 			Name:        SessionInterruptCommand,
 			Description: "interrupt session",
 			Keybindings: parseBindings("esc"),

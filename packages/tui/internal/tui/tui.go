@@ -1346,7 +1346,7 @@ func (a appModel) executeCommand(command commands.Command) (tea.Model, tea.Cmd) 
 		return a, toast.NewInfoToast("Sizing preset change - feature coming soon!")
 	case commands.AppExitCommand:
 		return a, tea.Quit
-	case commands.RevertCheckpointCommand:
+	case commands.SessionRevertCommand:
 		if a.app.Session == nil || a.app.Session.ID == "" {
 			return a, toast.NewErrorToast("No active session to revert")
 		}
