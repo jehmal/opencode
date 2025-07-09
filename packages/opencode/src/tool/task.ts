@@ -93,23 +93,12 @@ export const TaskTool = Tool.define({
       if (lastAssistantMsg?.metadata.assistant) {
         metadata = lastAssistantMsg.metadata.assistant
       } else {
-        // If still no metadata, use default from config
-        const { Config } = await import("../config/config")
-        const cfg = await Config.get()
-
-        // Parse the model string if it exists
-        if (cfg.model) {
-          const [providerID, ...modelParts] = cfg.model.split("/")
-          metadata = {
-            modelID: modelParts.join("/"),
-            providerID: providerID,
-          }
-        } else {
-          // Ultimate fallback
-          metadata = {
-            modelID: "claude-sonnet-4-20250514",
-            providerID: "anthropic",
-          }
+        // Use the same pattern as the main session - get the default model
+        const { Provider } = await import("../provider/provider")
+        const defaultModel = await Provider.defaultModel()
+        metadata = {
+          modelID: defaultModel.modelID,
+          providerID: defaultModel.providerID,
         }
       }
     }
