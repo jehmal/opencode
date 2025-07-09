@@ -41,19 +41,28 @@ export namespace Provider {
   const CUSTOM_LOADERS: Record<string, CustomLoader> = {
     async anthropic(provider) {
       const access = await AuthAnthropic.access()
-      if (!access) return { autoload: false }
+      
+      // Set zero cost for all models when using OAuth
       for (const model of Object.values(provider.models)) {
         model.cost = {
           input: 0,
           output: 0,
         }
       }
+      
+      // Always return autoload true to ensure anthropic provider is available
+      // The actual auth check happens during the fetch
       return {
         autoload: true,
         options: {
           apiKey: "",
           async fetch(input: any, init: any) {
             const access = await AuthAnthropic.access()
+            if (!access) {
+              // Try to provide more context about the auth failure
+              log.error("Anthropic OAuth token not found or expired")
+              throw new Error("Anthropic authentication required. Please run 'dgmo auth login' to authenticate.")
+            }
             const headers = {
               ...init.headers,
               authorization: `Bearer ${access}`,
@@ -197,6 +206,8 @@ export namespace Provider {
   const state = App.state("provider", async () => {
     const config = await Config.get()
     const database = await ModelsDev.get()
+    
+    log.info("Initializing provider state...")
 
     const providers: {
       [providerID: string]: {
@@ -312,7 +323,7 @@ export namespace Provider {
     for (const [providerID, fn] of Object.entries(CUSTOM_LOADERS)) {
       if (disabled.has(providerID)) continue
       const result = await fn(database[providerID])
-      if (result && (result.autoload || providers[providerID])) {
+      if (result && result.autoload) {
         mergeProvider(
           providerID,
           result.options ?? {},
