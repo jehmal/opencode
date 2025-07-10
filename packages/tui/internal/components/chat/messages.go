@@ -60,8 +60,12 @@ func (m *messagesComponent) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.tail {
 			m.viewport.GotoBottom()
 		}
-		// Return a command to ensure UI updates
-		return m, util.CmdHandler(renderFinishedMsg{})
+		// Return a batch of commands to ensure UI updates
+		// The nil command forces BubbleTea to re-render the entire UI
+		return m, tea.Batch(
+			util.CmdHandler(renderFinishedMsg{}),
+			func() tea.Msg { return nil }, // Force re-render
+		)
 	case dialog.ThemeSelectedMsg:
 		m.cache.Clear()
 		return m, m.Reload()
@@ -91,8 +95,12 @@ func (m *messagesComponent) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.tail {
 			m.viewport.GotoBottom()
 		}
-		// Return a command to ensure UI updates
-		return m, util.CmdHandler(renderFinishedMsg{})
+		// Return a batch of commands to ensure UI updates
+		// The nil command forces BubbleTea to re-render the entire UI
+		return m, tea.Batch(
+			util.CmdHandler(renderFinishedMsg{}),
+			func() tea.Msg { return nil }, // Force re-render
+		)
 	}
 
 	viewport, cmd := m.viewport.Update(msg)
