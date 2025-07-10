@@ -1,0 +1,5 @@
+To fix dgmo to open in your current directory, run this single command:
+
+bash /mnt/c/Users/jehma/Desktop/DGMSTT/opencode/packages/opencode/run-dgmo-fix.sh && source ~/.bashrc
+
+That's it! After running this command, dgmo will open in whatever directory you're in.
