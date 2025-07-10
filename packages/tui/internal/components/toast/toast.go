@@ -83,7 +83,20 @@ func (tm *ToastManager) Update(msg tea.Msg) (*ToastManager, tea.Cmd) {
 			Duration:  msg.Duration,
 		}
 
-		tm.toasts = append(tm.toasts, toast)
+		// Check if a toast with this ID already exists and replace it
+		found := false
+		for i, t := range tm.toasts {
+			if t.ID == id {
+				tm.toasts[i] = toast
+				found = true
+				break
+			}
+		}
+		
+		// If not found, append as new toast
+		if !found {
+			tm.toasts = append(tm.toasts, toast)
+		}
 
 		// Return command to dismiss after duration
 		return tm, tea.Tick(toast.Duration, func(t time.Time) tea.Msg {

@@ -913,15 +913,25 @@ func (a appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// Handle connection status changes
 		switch msg.Status {
 		case "connected":
-			cmds = append(cmds, toast.NewSuccessToast("Connected to task server"))
+			cmds = append(cmds, toast.NewSuccessToast("Connected to task server", 
+				toast.WithID("task-server-status"),
+				toast.WithDuration(3*time.Second)))
 		case "connecting":
-			cmds = append(cmds, toast.NewInfoToast("Connecting to task server..."))
+			cmds = append(cmds, toast.NewInfoToast("Connecting to task server...", 
+				toast.WithID("task-server-status"),
+				toast.WithDuration(30*time.Second))) // Keep visible while connecting
 		case "reconnecting":
-			cmds = append(cmds, toast.NewWarningToast("Reconnecting to task server..."))
+			cmds = append(cmds, toast.NewWarningToast("Reconnecting to task server...", 
+				toast.WithID("task-server-status"),
+				toast.WithDuration(30*time.Second))) // Keep visible while reconnecting
 		case "disconnected":
-			cmds = append(cmds, toast.NewWarningToast("Disconnected from task server"))
+			cmds = append(cmds, toast.NewWarningToast("Disconnected from task server", 
+				toast.WithID("task-server-status"),
+				toast.WithDuration(5*time.Second)))
 		case "failed":
-			cmds = append(cmds, toast.NewErrorToast(msg.Message))
+			cmds = append(cmds, toast.NewErrorToast(msg.Message, 
+				toast.WithID("task-server-status"),
+				toast.WithDuration(7*time.Second)))
 		}
 
 		// Update status component with connection info
