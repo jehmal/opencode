@@ -1,0 +1,10 @@
+#!/bin/bash
+
+# Save the current working directory
+ORIGINAL_CWD=$(pwd)
+
+# Path to the actual dgmo binary
+DGMO_BIN="/mnt/c/Users/jehma/Desktop/DGMSTT/opencode/packages/opencode/bin/dgmo"
+
+# Execute dgmo with the original working directory
+cd "$ORIGINAL_CWD" && exec "$DGMO_BIN" "$@"
