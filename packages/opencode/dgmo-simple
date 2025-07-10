@@ -1,0 +1,14 @@
+#!/bin/bash
+# Simple dgmo launcher
+
+# Save current directory
+WORK_DIR="$(pwd)"
+
+# Go to opencode directory
+cd /mnt/c/Users/jehma/Desktop/DGMSTT/opencode/packages/opencode
+
+# Run dgmo with bun
+bun run src/index.ts "$@"
+
+# Return to original directory
+cd "$WORK_DIR"
