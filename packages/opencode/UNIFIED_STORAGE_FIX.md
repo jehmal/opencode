@@ -50,7 +50,7 @@ Created `migrate-sessions.sh` script that:
 
 ### 3. Results
 
-- ✅ All 273 sessions migrated successfully
+- ✅ All 273 sessions migrated successfuly
 - ✅ Sessions now accessible from any directory
 - ✅ No more "lost" sessions
 - ✅ Sub-sessions properly linked to parent sessions

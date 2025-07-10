@@ -12,7 +12,7 @@ Here's how you write your first program in Python:
 print("Hello, World!")
 ```
 
-That's it! Just one line of code, and you've officially become a programmer. When you run this code, your computer will display "Hello, World!" on the screen—a simple but magical moment where you've successfully communicated with your machine.
+That's it! Just one line of code, and you've officially become a programmer. When you run this code, your computer will display "Hello, World!" on the screen—a simple but magical moment where you've successfuly communicated with your machine.
 
 ## Conclusion
 

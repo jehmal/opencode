@@ -155,7 +155,7 @@ After implementation:
 - Sub-sessions ARE being created correctly (verified in storage)
 - Index files ARE being created with correct parent mapping
 - The issue is specifically in the retrieval/display pipeline
-- Task tool executes and creates sub-sessions successfully
+- Task tool executes and creates sub-sessions successfuly
 - Storage system is working - this is a display issue only
 - Remember: Don't recreate working components, focus on the display fix
 

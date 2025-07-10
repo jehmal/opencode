@@ -67,7 +67,14 @@ export namespace MCP {
                 ...mcp.environment,
               },
             }),
-          }).catch(() => {})
+          }).catch((error) => {
+            Log.error(`Failed to start MCP server ${key}`, {
+              command: cmd,
+              args,
+              error: error instanceof Error ? error.message : String(error)
+            })
+            return null
+          })
           if (!client) {
             Bus.publish(Session.Event.Error, {
               error: {

@@ -33,10 +33,15 @@ func main() {
 	url := os.Getenv("DGMO_SERVER")
 
 	appInfoStr := os.Getenv("DGMO_APP_INFO")
+	if appInfoStr == "" {
+		slog.Error("DGMO_APP_INFO environment variable is not set")
+		os.Exit(1)
+	}
+	
 	var appInfo opencode.App
 	err := json.Unmarshal([]byte(appInfoStr), &appInfo)
 	if err != nil {
-		slog.Error("Failed to unmarshal app info", "error", err)
+		slog.Error("Failed to unmarshal app info", "error", err, "appInfoStr", appInfoStr)
 		os.Exit(1)
 	}
 
@@ -173,6 +178,7 @@ func main() {
 
 	// Attempt connection in background to avoid blocking startup
 	go func() {
+		defer cancel() // Ensure context is cancelled on exit
 		slog.Info("TUI attempting to connect to WebSocket server...")
 		if err := taskClient.Connect(); err != nil {
 			slog.Error("TUI failed to connect to task event server", "error", err)
@@ -185,7 +191,10 @@ func main() {
 		}
 	}()
 
+	// Event streaming goroutine with cleanup
+	done := make(chan struct{})
 	go func() {
+		defer close(done)
 		stream := httpClient.Event.ListStreaming(ctx)
 		for stream.Next() {
 			evt := stream.Current().AsUnion()
@@ -201,6 +210,22 @@ func main() {
 	result, err := program.Run()
 	if err != nil {
 		slog.Error("TUI error", "error", err)
+	}
+
+	// Cleanup
+	cancel() // Cancel context to stop all goroutines
+	
+	// Wait for event streaming to finish with timeout
+	select {
+	case <-done:
+		slog.Info("Event streaming goroutine finished")
+	case <-time.After(2 * time.Second):
+		slog.Warn("Timeout waiting for event streaming goroutine")
+	}
+	
+	// Shutdown app resources
+	if app_ != nil {
+		app_.Shutdown()
 	}
 
 	slog.Info("TUI exited", "result", result)

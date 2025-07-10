@@ -137,7 +137,7 @@ The system handles these event types:
 
 - `task.started`: New task begins
 - `task.progress`: Progress update (0-100%)
-- `task.completed`: Task finished successfully
+- `task.completed`: Task finished successfuly
 - `task.failed`: Task encountered an error
 
 ### Message Flow

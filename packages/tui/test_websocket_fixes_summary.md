@@ -92,7 +92,7 @@ The WebSocket connection fix directly resolves the /continue command issues:
 1. User types "/continue" in TUI
 2. **Initial toast**: "🔄 Generating continuation prompt..." (immediate)
 3. **Progress events**: "Task progress: 25%" → "Task progress: 75%" (real-time)
-4. **Completion**: "✅ Continuation prompt generated successfully" (with stats)
+4. **Completion**: "✅ Continuation prompt generated successfuly" (with stats)
 5. **Clipboard**: Prompt automatically copied with success confirmation
 
 ### Technical Flow Now Working:

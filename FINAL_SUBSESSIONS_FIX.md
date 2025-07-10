@@ -112,14 +112,14 @@ if (!isAllowed) {
 
 [SUB-SESSION DEBUG] Creating sub-session: { ... }
 [SUB-SESSION DEBUG] Writing to: session/sub-sessions/ses_yyy
-[SUB-SESSION DEBUG] Sub-session created successfully
+[SUB-SESSION DEBUG] Sub-session created successfuly
 ```
 
 ## Verification Checklist
 
 - [ ] No `[SESSION] Tool filtered out: task` message
 - [ ] `isMainSession: true` in logs
-- [ ] Sub-sessions created successfully
+- [ ] Sub-sessions created successfuly
 - [ ] Sub-sessions appear in /sub-session dialog
 - [ ] Tree view shows parent-child relationships
 - [ ] Files created in correct project directory

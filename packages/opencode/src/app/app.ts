@@ -49,9 +49,10 @@ export namespace App {
     log.info("creating", {
       cwd: input.cwd,
     })
-    const git = await Filesystem.findUp(".git", input.cwd).then(([x]) =>
-      x ? path.dirname(x) : undefined,
-    )
+    const gitResult = await Filesystem.findUp(".git", input.cwd)
+    const git = gitResult && gitResult.length > 0 && gitResult[0] 
+      ? path.dirname(gitResult[0]) 
+      : undefined
     log.info("git", { git })
 
     // Always use a unified storage location for DGMO sessions
@@ -105,7 +106,11 @@ export namespace App {
         for (const [key, entry] of app.services.entries()) {
           if (!entry.shutdown) continue
           log.info("shutdown", { name: key })
-          await entry.shutdown?.(await entry.state)
+          try {
+            await entry.shutdown(await entry.state)
+          } catch (error) {
+            log.error("Error during service shutdown", { name: key, error })
+          }
         }
       }
     })

@@ -4,6 +4,7 @@ import { App } from "../app/app"
 import { Identifier } from "../id/id"
 import { Storage } from "../storage/storage"
 import { Log } from "../util/log"
+import { EnhancedPrompt, PromptMetadata } from "../types/session-types"
 import {
   generateText,
   LoadAPIKeyError,
@@ -106,11 +107,13 @@ export namespace Session {
       const sessions = new Map<string, Info>()
       const messages = new Map<string, Message.Info[]>()
       const pending = new Map<string, AbortController>()
+      const sessionLoadingMap = new Map<string, Promise<Info>>()
 
       return {
         sessions,
         messages,
         pending,
+        sessionLoadingMap,
       }
     },
     async (state) => {
@@ -173,13 +176,48 @@ export namespace Session {
   }
 
   export async function get(id: string) {
-    const result = state().sessions.get(id)
-    if (result) {
-      return result
+    // Check cache first
+    const s = state()
+    const cached = s.sessions.get(id)
+    if (cached) {
+      return cached
     }
-    const read = await Storage.readJSON<Info>("session/info/" + id)
-    state().sessions.set(id, read)
-    return read as Info
+    
+    // Check if already loading
+    const existingPromise = s.sessionLoadingMap.get(id)
+    if (existingPromise) {
+      return existingPromise
+    }
+    
+    // Create a promise for this session to prevent race conditions
+    const loadingPromise = (async () => {
+      try {
+        const read = await Storage.readJSON<Info>("session/info/" + id)
+        
+        // Check again in case another request already cached it
+        const existing = state().sessions.get(id)
+        if (existing) {
+          return existing
+        }
+        
+        state().sessions.set(id, read)
+        return read as Info
+      } catch (error) {
+        throw new Error(`Failed to read session ${id}: ${error}`)
+      }
+    })()
+    
+    // Store the loading promise to prevent duplicate loads
+    s.sessionLoadingMap.set(id, loadingPromise)
+    
+    try {
+      const result = await loadingPromise
+      s.sessionLoadingMap.delete(id)
+      return result
+    } catch (error) {
+      s.sessionLoadingMap.delete(id)
+      throw error
+    }
   }
 
   export async function getShare(id: string) {
@@ -470,12 +508,22 @@ export namespace Session {
           })
 
           // Store metadata for the assistant message
-          promptingMetadata = {
-            techniques: enhanced.metadata.techniques,
-            originalPrompt,
-            enhancedPrompt: enhanced.content,
-            selectionMode: "auto",
-            confidence: enhanced.metadata.confidence,
+          if (enhanced.metadata) {
+            promptingMetadata = {
+              techniques: enhanced.metadata.techniques || [],
+              originalPrompt,
+              enhancedPrompt: enhanced.content,
+              selectionMode: "auto",
+              confidence: enhanced.metadata.confidence || 0,
+            }
+          } else {
+            promptingMetadata = {
+              techniques: [],
+              originalPrompt,
+              enhancedPrompt: enhanced.content,
+              selectionMode: "auto",
+              confidence: 0,
+            }
           }
 
           l.info("Prompt enhanced with techniques", {
@@ -1177,13 +1225,11 @@ export namespace Session {
       output: usage.completionTokens ?? 0,
       reasoning: 0,
       cache: {
-        write: (metadata?.["anthropic"]?.["cacheCreationInputTokens"] ??
-          // @ts-expect-error
-          metadata?.["bedrock"]?.["usage"]?.["cacheWriteInputTokens"] ??
+        write: ((metadata as PromptMetadata)?.["anthropic"]?.["cacheCreationInputTokens"] ??
+          (metadata as PromptMetadata)?.["bedrock"]?.["usage"]?.["cacheWriteInputTokens"] ??
           0) as number,
-        read: (metadata?.["anthropic"]?.["cacheReadInputTokens"] ??
-          // @ts-expect-error
-          metadata?.["bedrock"]?.["usage"]?.["cacheReadInputTokens"] ??
+        read: ((metadata as PromptMetadata)?.["anthropic"]?.["cacheReadInputTokens"] ??
+          (metadata as PromptMetadata)?.["bedrock"]?.["usage"]?.["cacheReadInputTokens"] ??
           0) as number,
       },
     }

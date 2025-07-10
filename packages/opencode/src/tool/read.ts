@@ -28,6 +28,19 @@ export const ReadTool = Tool.define({
   async execute(params, ctx) {
     let filePath = params.filePath
 
+    // Security: Validate file path before normalization
+    if (params.filePath.includes('..') || params.filePath.includes('\0')) {
+      throw new Error("Invalid characters in file path")
+    }
+    
+    // Normalize and validate file path
+    filePath = path.normalize(filePath)
+    
+    // Double-check after normalization
+    if (filePath.includes('..')) {
+      throw new Error("Path traversal not allowed")
+    }
+    
     // Convert Windows paths to WSL format if needed
     const windowsPathMatch = filePath.match(/^([A-Za-z]):\\(.*)/)
     if (windowsPathMatch) {
@@ -38,6 +51,50 @@ export const ReadTool = Tool.define({
 
     if (!path.isAbsolute(filePath)) {
       filePath = path.join(process.cwd(), filePath)
+    }
+    
+    // Ensure the file is within allowed directories
+    const resolvedPath = path.resolve(filePath)
+    const cwd = path.resolve(process.cwd())
+    const app = App.info()
+    const projectRoot = path.resolve(app.path.cwd)
+    
+    // Allow reading from current directory or project root with proper boundary checks
+    const validPaths = [cwd, projectRoot].filter(p => p)
+    let isValidPath = false
+    for (const validPath of validPaths) {
+      if (resolvedPath.startsWith(validPath + path.sep) || resolvedPath === validPath) {
+        isValidPath = true
+        break
+      }
+    }
+    
+    if (!isValidPath) {
+      throw new Error("File path must be within the current or project directory")
+    }
+    
+    // Verify symlinks don't escape allowed directories
+    try {
+      const realPath = fs.existsSync(resolvedPath) 
+        ? path.resolve(fs.realpathSync(resolvedPath))
+        : resolvedPath
+      
+      let isRealPathValid = false
+      for (const validPath of validPaths) {
+        if (realPath.startsWith(validPath + path.sep) || realPath === validPath) {
+          isRealPathValid = true
+          break
+        }
+      }
+      
+      if (!isRealPathValid) {
+        throw new Error("Symlinks must not escape allowed directories")
+      }
+    } catch (e) {
+      if (e instanceof Error && e.message.includes("escape")) {
+        throw e
+      }
+      // If realpath fails for other reasons, continue
     }
 
     const file = Bun.file(filePath)

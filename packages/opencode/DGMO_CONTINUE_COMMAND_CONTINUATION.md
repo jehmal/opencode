@@ -83,7 +83,7 @@ Search: "ReAct framework Chain of Thought systematic debugging approach"
 4. Debug event routing through task-events system
 5. Ensure events reach WebSocket clients properly
 
-**Expected Output:** Server events successfully reaching TUI client
+**Expected Output:** Server events successfuly reaching TUI client
 **Location:** `packages/opencode/src/server/server.ts` and `packages/opencode/src/events/`
 **Dependencies:** WebSocket connection established
 
@@ -138,7 +138,7 @@ Search: "ReAct framework Chain of Thought systematic debugging approach"
 
 1. **User sees initial toast:** "Generating continuation prompt..." appears immediately
 2. **Progress updates visible:** "Task progress: 25%" and "Task progress: 75%" display
-3. **Completion notification:** "Continuation prompt generated successfully" with statistics
+3. **Completion notification:** "Continuation prompt generated successfuly" with statistics
 4. **Clipboard functionality:** Prompt automatically copied to clipboard
 5. **Error handling:** Clear error messages for any failures
 6. **Performance:** Complete process under 5 seconds
@@ -174,7 +174,7 @@ After implementation:
 
 ## Important Notes
 
-- **Systematic Approach:** Use ReAct framework with Chain of Thought reasoning that successfully resolved compilation issues
+- **Systematic Approach:** Use ReAct framework with Chain of Thought reasoning that successfuly resolved compilation issues
 - **Event-Driven Architecture:** Server emits events, client receives and updates UI in real-time
 - **User Experience Priority:** Visible progress feedback is essential - no silent operations
 - **WebSocket Reliability:** Implement proper connection handling, timeouts, and reconnection logic

@@ -4,6 +4,7 @@
 
 import { z } from "zod"
 import * as path from "path"
+import * as fs from "fs"
 import { Tool } from "./tool"
 import { LSP } from "../lsp"
 import { createTwoFilesPatch } from "diff"
@@ -40,9 +41,45 @@ export const EditTool = Tool.define({
     }
 
     const app = App.info()
-    const filepath = path.isAbsolute(params.filePath)
-      ? params.filePath
-      : path.join(app.path.cwd, params.filePath)
+    
+    // Security: Validate and normalize file path
+    const normalizedPath = path.normalize(params.filePath)
+    
+    // Prevent directory traversal attacks - check before and after normalization
+    if (params.filePath.includes('..') || normalizedPath.includes('..')) {
+      throw new Error("Path traversal not allowed")
+    }
+    
+    // Check for null bytes
+    if (params.filePath.includes('\0')) {
+      throw new Error("Path cannot contain null bytes")
+    }
+    
+    // Resolve to absolute path
+    const filepath = path.isAbsolute(normalizedPath)
+      ? normalizedPath
+      : path.join(app.path.cwd, normalizedPath)
+    
+    // Canonicalize the path to resolve symlinks and ensure it's within bounds
+    const resolvedPath = path.resolve(filepath)
+    const projectRoot = path.resolve(app.path.cwd)
+    
+    // Double-check after resolution
+    if (!resolvedPath.startsWith(projectRoot + path.sep) && resolvedPath !== projectRoot) {
+      throw new Error("File path must be within the project directory")
+    }
+    
+    // Verify no symlinks escape the project directory
+    try {
+      const realPath = await Bun.file(resolvedPath).exists() 
+        ? path.resolve(await fs.promises.realpath(resolvedPath))
+        : resolvedPath
+      if (!realPath.startsWith(projectRoot + path.sep) && realPath !== projectRoot) {
+        throw new Error("Symlinks must not escape the project directory")
+      }
+    } catch (e) {
+      // If realpath fails, continue with regular validation
+    }
 
     await Permission.ask({
       id: "edit",

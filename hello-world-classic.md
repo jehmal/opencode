@@ -50,7 +50,7 @@ Java requires more structure - a class definition and a main method. This reflec
 
 ## The Significance
 
-While "Hello, World!" may seem trivial, it represents something profound: the moment when abstract programming concepts become tangible reality. When you see those two words appear on your screen, you've successfully:
+While "Hello, World!" may seem trivial, it represents something profound: the moment when abstract programming concepts become tangible reality. When you see those two words appear on your screen, you've successfuly:
 
 - Written valid syntax in a programming language
 - Used the language's output mechanism

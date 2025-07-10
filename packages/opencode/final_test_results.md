@@ -1,7 +1,7 @@
 # /continue Command Fix Test Results
 
 ## Summary
-The fix for the `/continue` command bug has been successfully implemented. The command now generates **session-specific continuation prompts** instead of using cached/hardcoded defaults.
+The fix for the `/continue` command bug has been successfuly implemented. The command now generates **session-specific continuation prompts** instead of using cached/hardcoded defaults.
 
 ## What Was Fixed
 

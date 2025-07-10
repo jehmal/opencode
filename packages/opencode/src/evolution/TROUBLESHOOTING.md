@@ -22,7 +22,7 @@ bun run /opencode/packages/opencode/src/evolution/__tests__/debug-evolution.ts
 # ℹ Phase: Generation started
 # ℹ Phase: Testing started
 # ℹ Phase: Validation started
-# ✓ Evolution completed successfully
+# ✓ Evolution completed successfuly
 ```
 
 ### 2. Check Bridge Connection

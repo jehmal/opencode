@@ -8,6 +8,7 @@ import { SubSession } from "../session/sub-session"
 import { resolver, validator as zValidator } from "hono-openapi/zod"
 import { z } from "zod"
 import { Message } from "../session/message"
+import { ProjectContextError, TaskEventServer, TaskEventStats } from "../types/server-types"
 import { Provider } from "../provider/provider"
 import { App } from "../app/app"
 import { mapValues } from "remeda"
@@ -64,17 +65,30 @@ function analyzeSessionMessages(
     sessionTitle: session.title,
   })
 
-  const analysis = {
+  interface ProjectAnalysis {
+    projectName: string;
+    projectGoal: string;
+    completionPercentage: number;
+    completedComponents: string[];
+    remainingTasks: string[];
+    criticalFiles: string[];
+    knownIssues: string[];
+    architecturalConstraints: string[];
+    successCriteria: string[];
+    testingApproach: string[];
+  }
+
+  const analysis: ProjectAnalysis = {
     projectName: "",
     projectGoal: "",
     completionPercentage: 50,
-    completedComponents: [] as any[],
-    remainingTasks: [] as any[],
-    criticalFiles: [] as any[],
-    knownIssues: [] as any[],
-    architecturalConstraints: [] as string[],
-    successCriteria: [] as string[],
-    testingApproach: [] as string[],
+    completedComponents: [],
+    remainingTasks: [],
+    criticalFiles: [],
+    knownIssues: [],
+    architecturalConstraints: [],
+    successCriteria: [],
+    testingApproach: [],
   }
 
   // Extract project context from messages
@@ -83,7 +97,7 @@ function analyzeSessionMessages(
   // Extract file paths mentioned
   const mentionedFiles = new Set<string>()
   const discussedTopics = new Set<string>()
-  const errors = [] as any[]
+  const errors: ProjectContextError[] = []
 
   for (const msg of recentMessages) {
     if (msg.role === "user" || msg.role === "assistant") {
@@ -103,7 +117,7 @@ function analyzeSessionMessages(
             const errorMatch = part.text.match(
               /(?:error|Error|bug)[:.]?\s*(.{0,100})/,
             )
-            if (errorMatch) {
+            if (errorMatch && errorMatch[1]) {
               errors.push({ issue: errorMatch[1].trim(), fromMessage: msg.id })
             }
           }
@@ -635,7 +649,9 @@ export namespace Server {
           try {
             const subSessions = await SubSession.getByParent(parentId)
             return c.json(subSessions)
-          } catch (error: any) {
+          } catch (error) {
+            const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred'
+            Log.error("Failed to get sub-sessions", { parentId, error: errorMessage })
             return c.json([])
           }
         },
@@ -1025,7 +1041,7 @@ export namespace Server {
           description: "Restore session to a specific checkpoint",
           responses: {
             200: {
-              description: "Checkpoint restored successfully",
+              description: "Checkpoint restored successfuly",
               content: {
                 "application/json": {
                   schema: resolver(
@@ -1051,7 +1067,7 @@ export namespace Server {
             await CheckpointManager.restoreCheckpoint(checkpointId)
             return c.json({
               success: true,
-              message: "Checkpoint restored successfully",
+              message: "Checkpoint restored successfuly",
             })
           } catch (error) {
             log.error("Failed to restore checkpoint", { error, checkpointId })
@@ -1095,18 +1111,29 @@ export namespace Server {
           },
         }),
         async (c) => {
-          const { taskEventDiagnostics } = await import(
-            "../events/task-events/diagnostics"
-          )
-          const { taskEventServer } = await import(
-            "../events/task-events/server"
-          )
+          let taskEventDiagnostics;
+          let taskEventServer: TaskEventServer | null = null;
+          
+          try {
+            const diagnosticsModule = await import("../events/task-events/diagnostics");
+            taskEventDiagnostics = diagnosticsModule.taskEventDiagnostics;
+          } catch (error) {
+            Log.error("Failed to import task event diagnostics", { error });
+            return c.json({ error: "Failed to load diagnostics" }, 500);
+          }
+          
+          try {
+            const serverModule = await import("../events/task-events/server");
+            taskEventServer = serverModule.taskEventServer as TaskEventServer;
+          } catch (error) {
+            Log.error("Failed to import task event server", { error });
+          }
 
-          const stats = taskEventDiagnostics.getStats()
+          const stats = taskEventDiagnostics?.getStats() || {} as TaskEventStats;
 
           return c.json({
             ...stats,
-            websocketClients: (taskEventServer as any).clients?.size || 0,
+            websocketClients: taskEventServer?.clients?.size || 0,
           })
         },
       )
@@ -1149,7 +1176,7 @@ export namespace Server {
           description: "Emit prompting technique selected event",
           responses: {
             200: {
-              description: "Event emitted successfully",
+              description: "Event emitted successfuly",
               content: {
                 "application/json": {
                   schema: resolver(z.boolean()),
@@ -1190,7 +1217,7 @@ export namespace Server {
           description: "Emit prompting technique applied event",
           responses: {
             200: {
-              description: "Event emitted successfully",
+              description: "Event emitted successfuly",
               content: {
                 "application/json": {
                   schema: resolver(z.boolean()),
@@ -1232,7 +1259,7 @@ export namespace Server {
           description: "Emit prompting technique performance event",
           responses: {
             200: {
-              description: "Event emitted successfully",
+              description: "Event emitted successfuly",
               content: {
                 "application/json": {
                   schema: resolver(z.boolean()),
@@ -1272,7 +1299,7 @@ export namespace Server {
           description: "Emit prompting technique evaluation event",
           responses: {
             200: {
-              description: "Event emitted successfully",
+              description: "Event emitted successfuly",
               content: {
                 "application/json": {
                   schema: resolver(z.boolean()),

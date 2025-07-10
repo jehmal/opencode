@@ -1,5 +1,6 @@
 import { z } from "zod"
 import * as path from "path"
+import * as fs from "fs"
 import { Tool } from "./tool"
 import { LSP } from "../lsp"
 import { Permission } from "../permission"
@@ -22,9 +23,46 @@ export const WriteTool = Tool.define({
   }),
   async execute(params, ctx) {
     const app = App.info()
-    const filepath = path.isAbsolute(params.filePath)
-      ? params.filePath
-      : path.join(app.path.cwd, params.filePath)
+    
+    // Security: Validate before normalization
+    if (params.filePath.includes('..') || params.filePath.includes('\0')) {
+      throw new Error("Invalid characters in file path")
+    }
+    
+    // Normalize and validate file path
+    const normalizedPath = path.normalize(params.filePath)
+    
+    // Double-check after normalization
+    if (normalizedPath.includes('..')) {
+      throw new Error("Path traversal not allowed")
+    }
+    
+    const filepath = path.isAbsolute(normalizedPath)
+      ? normalizedPath
+      : path.join(app.path.cwd, normalizedPath)
+    
+    // Canonicalize and ensure the file is within the project directory
+    const resolvedPath = path.resolve(filepath)
+    const projectRoot = path.resolve(app.path.cwd)
+    
+    // Proper boundary check
+    if (!resolvedPath.startsWith(projectRoot + path.sep) && resolvedPath !== projectRoot) {
+      throw new Error("File path must be within the project directory")
+    }
+    
+    // Check if path would escape via symlinks
+    const dir = path.dirname(resolvedPath)
+    try {
+      // Check parent directory realpath
+      if (await Bun.file(dir).exists()) {
+        const realDir = path.resolve(await fs.promises.realpath(dir))
+        if (!realDir.startsWith(projectRoot + path.sep) && realDir !== projectRoot) {
+          throw new Error("Directory path must not escape project via symlinks")
+        }
+      }
+    } catch (e) {
+      // If realpath fails, continue with regular validation
+    }
 
     const file = Bun.file(filepath)
     const exists = await file.exists()

@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/charmbracelet/bubbles/v2/key"
@@ -88,7 +89,7 @@ type appModel struct {
 	continuationTaskID            string                // Track active continuation prompt task ID
 	continuationPrompt            string                // Store the continuation prompt until task completes
 	pendingContinuationCompletion *app.TaskCompletedMsg // Store early-arriving continuation task completion
-
+	continuationMutex             sync.RWMutex          // Mutex for thread-safe access to continuation fields
 }
 
 func (a appModel) Init() tea.Cmd {
@@ -821,7 +822,12 @@ func (a appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 	case struct{ TimeoutForTaskID string }:
 		// Handle timeout for continuation prompt task
-		if a.continuationTaskID == msg.TimeoutForTaskID && a.continuationTaskID != "" {
+		a.continuationMutex.RLock()
+		taskMatch := a.continuationTaskID == msg.TimeoutForTaskID && a.continuationTaskID != ""
+		prompt := a.continuationPrompt
+		a.continuationMutex.RUnlock()
+		
+		if taskMatch {
 			// DEBUG: Log timeout
 			slog.Warn("[CONTINUATION DEBUG] Timeout waiting for TaskCompletedMsg",
 				"taskID", msg.TimeoutForTaskID,
@@ -830,7 +836,7 @@ func (a appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 			// We have the prompt but didn't get task completion
 			// Create the session anyway
-			if a.continuationPrompt != "" {
+			if prompt != "" {
 				// Create a new session for the continuation
 				session, err := a.app.CreateSession(context.Background())
 				if err != nil {
@@ -856,11 +862,13 @@ func (a appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				))
 
 				// Send the continuation prompt as the first message in the new session
-				cmds = append(cmds, a.app.SendChatMessage(context.Background(), a.continuationPrompt, []app.Attachment{}))
+				cmds = append(cmds, a.app.SendChatMessage(context.Background(), prompt, []app.Attachment{}))
 
-				// Clear continuation tracking
+				// Clear continuation tracking with lock
+				a.continuationMutex.Lock()
 				a.continuationTaskID = ""
 				a.continuationPrompt = ""
+				a.continuationMutex.Unlock()
 			}
 		}
 	}

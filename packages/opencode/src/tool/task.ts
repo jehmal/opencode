@@ -1,6 +1,7 @@
 import { z } from "zod"
 import { Bus } from "../bus"
 import { AgentConfig } from "../config/agent-config"
+import { TaskPart, TaskResult } from "../types/task-types"
 import {
   emitDetailedTaskProgress,
   emitTaskSummary,
@@ -383,8 +384,8 @@ export const TaskTool = Tool.define({
       unsub()
 
       // Extract text output for summary
-      const output =
-        result.parts.findLast((x) => x.type === "text")?.text || "No output"
+      const textPart = result.parts.findLast((x): x is TaskPart & { text: string } => x.type === "text" && x.text !== undefined)
+      const output = textPart?.text || "No output"
 
       // Mark sub-session as completed
       await SubSession.complete(

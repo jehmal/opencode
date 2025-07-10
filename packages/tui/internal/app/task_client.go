@@ -87,6 +87,11 @@ type TaskClient struct {
 	// Agent counting per session
 	sessionAgentCounters map[string]int32 // sessionID -> next agent number
 	agentCounterMu       sync.RWMutex
+	// Goroutine tracking
+	wg               sync.WaitGroup
+	goroutineCtx     context.Context
+	goroutineCancel  context.CancelFunc
+	reconnecting     bool // prevent multiple reconnection attempts
 }
 
 // TaskEventHandlers contains callbacks for task events
@@ -253,21 +258,31 @@ func (tc *TaskClient) ConnectWithRetry(enableRetry bool) error {
 	// Do this WITHOUT holding the mutex to avoid blocking other operations
 	if atomic.LoadInt32(&tc.retryCount) == 0 {
 		slog.Info("Waiting for WebSocket server to be ready...")
-		for i := 0; i < 60; i++ { // Increased to 60 seconds
-			if tc.isServerReady() {
-				slog.Info("WebSocket server is ready", "elapsed_seconds", i)
-				break
+		ticker := time.NewTicker(1 * time.Second)
+		defer ticker.Stop()
+		
+		timeout := time.After(60 * time.Second)
+		elapsed := 0
+		
+		for {
+			select {
+			case <-tc.ctx.Done():
+				return tc.ctx.Err()
+			case <-timeout:
+				slog.Warn("Server not ready after 60 seconds, attempting connection anyway")
+				goto connect
+			case <-ticker.C:
+				elapsed++
+				if tc.isServerReady() {
+					slog.Info("WebSocket server is ready", "elapsed_seconds", elapsed)
+					goto connect
+				}
+				if elapsed%10 == 0 {
+					slog.Info("Still waiting for server...", "elapsed", fmt.Sprintf("%ds", elapsed))
+				}
 			}
-			if i%10 == 0 && i > 0 {
-				slog.Info("Still waiting for server...", "elapsed", fmt.Sprintf("%ds", i))
-			}
-			time.Sleep(1 * time.Second)
 		}
-
-		// Final check before attempting connection
-		if !tc.isServerReady() {
-			slog.Warn("Server not ready after 60 seconds, attempting connection anyway")
-		}
+		connect:
 	}
 
 	var lastErr error
@@ -320,11 +335,26 @@ func (tc *TaskClient) ConnectWithRetry(enableRetry bool) error {
 		tc.setState(StateConnected, nil)
 		tc.updateHeartbeat()
 
+		// Track goroutines
+		tc.mu.Lock()
+		if tc.goroutineCtx == nil {
+			tc.goroutineCtx, tc.goroutineCancel = context.WithCancel(tc.ctx)
+		}
+		tc.mu.Unlock()
+		
 		// Process any queued events
-		go tc.processQueuedEvents()
+		go func() {
+			tc.wg.Add(1)
+			defer tc.wg.Done()
+			tc.processQueuedEvents()
+		}()
 
 		// Start reading messages
-		go tc.readLoop()
+		go func() {
+			tc.wg.Add(1)
+			defer tc.wg.Done()
+			tc.readLoop()
+		}()
 
 		slog.Info("Connected to task event server", "url", tc.url, "attempts", attempt+1)
 		return nil
@@ -382,18 +412,35 @@ func (tc *TaskClient) processQueuedEvents() {
 // Disconnect closes the WebSocket connection
 func (tc *TaskClient) Disconnect() {
 	tc.mu.Lock()
-	defer tc.mu.Unlock()
-
 	tc.reconnect = false
+	if tc.goroutineCancel != nil {
+		tc.goroutineCancel()
+	}
+	tc.mu.Unlock()
+	
 	tc.cancel()
 	tc.setState(StateDisconnected, nil)
 
+	tc.mu.Lock()
 	if tc.conn != nil {
 		tc.conn.Close()
 		tc.conn = nil
 	}
+	tc.mu.Unlock()
 
-	slog.Info("Disconnected from task event server")
+	// Wait for goroutines to finish with timeout
+	done := make(chan struct{})
+	go func() {
+		tc.wg.Wait()
+		close(done)
+	}()
+	
+	select {
+	case <-done:
+		slog.Info("Disconnected from task event server - all goroutines finished")
+	case <-time.After(5 * time.Second):
+		slog.Warn("Disconnected from task event server - timeout waiting for goroutines")
+	}
 }
 
 // IsConnected returns whether the client is currently connected
@@ -460,7 +507,24 @@ func (tc *TaskClient) readLoop() {
 
 		// Attempt reconnection if enabled and not shutting down
 		if tc.reconnect && tc.ctx.Err() == nil {
+			// Prevent multiple simultaneous reconnection attempts
+			tc.mu.Lock()
+			if tc.reconnecting {
+				tc.mu.Unlock()
+				return
+			}
+			tc.reconnecting = true
+			tc.mu.Unlock()
+			
 			go func() {
+				tc.wg.Add(1)
+				defer tc.wg.Done()
+				defer func() {
+					tc.mu.Lock()
+					tc.reconnecting = false
+					tc.mu.Unlock()
+				}()
+				
 				delay := tc.calculateBackoffDelay(int(atomic.LoadInt32(&tc.retryCount)))
 				slog.Info("Scheduling reconnection", "delay", delay)
 
@@ -476,11 +540,11 @@ func (tc *TaskClient) readLoop() {
 		}
 	}()
 
-	// Set connection timeout
+	// Set connection timeout with nil check
 	tc.mu.RLock()
 	conn := tc.conn
 	tc.mu.RUnlock()
-
+	
 	if conn != nil {
 		conn.SetReadDeadline(time.Now().Add(70 * time.Second)) // Slightly longer than heartbeat interval
 	}
@@ -635,10 +699,17 @@ func (tc *TaskClient) handleEvent(event TaskEvent) {
 
 		// Clean up completed task after a delay
 		go func() {
-			time.Sleep(30 * time.Second)
-			tc.mu.Lock()
-			delete(tc.tasks, data.TaskID)
-			tc.mu.Unlock()
+			tc.wg.Add(1)
+			defer tc.wg.Done()
+			
+			select {
+			case <-time.After(30 * time.Second):
+				tc.mu.Lock()
+				delete(tc.tasks, data.TaskID)
+				tc.mu.Unlock()
+			case <-tc.ctx.Done():
+				return
+			}
 		}()
 
 	case "task.failed":
@@ -661,10 +732,17 @@ func (tc *TaskClient) handleEvent(event TaskEvent) {
 
 		// Clean up failed task after a delay
 		go func() {
-			time.Sleep(30 * time.Second)
-			tc.mu.Lock()
-			delete(tc.tasks, data.TaskID)
-			tc.mu.Unlock()
+			tc.wg.Add(1)
+			defer tc.wg.Done()
+			
+			select {
+			case <-time.After(30 * time.Second):
+				tc.mu.Lock()
+				delete(tc.tasks, data.TaskID)
+				tc.mu.Unlock()
+			case <-tc.ctx.Done():
+				return
+			}
 		}()
 
 	case "heartbeat":

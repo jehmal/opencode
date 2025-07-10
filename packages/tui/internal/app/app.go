@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	"log/slog"
@@ -41,12 +42,18 @@ type App struct {
 	SessionStack         []string // Stack of session IDs for navigation history
 	CurrentSessionType   string   // "main" or "sub"
 	LastViewedSubSession string   // Track last viewed sub-session for quick access
+	sessionMutex         sync.RWMutex // Mutex for thread-safe access to session fields
 
 	// Task tracking
 	TaskClient *TaskClient
 
 	// Checkpoint service
 	CheckpointService *CheckpointService
+
+	// Shutdown handling
+	shutdownCtx    context.Context
+	shutdownCancel context.CancelFunc
+	shutdownWg     sync.WaitGroup
 }
 
 type SessionSelectedMsg = *opencode.Session
@@ -158,6 +165,9 @@ func New(
 	app.CurrentSessionType = "main" // Default to main
 	app.SessionStack = []string{}
 
+	// Initialize shutdown context
+	app.shutdownCtx, app.shutdownCancel = context.WithCancel(context.Background())
+
 	return app, nil
 }
 
@@ -267,19 +277,26 @@ func (a *App) InitializeProject(ctx context.Context) tea.Cmd {
 		return nil
 	}
 
-	a.Session = session
-	cmds = append(cmds, util.CmdHandler(SessionSelectedMsg(session)))
-
+	// Don't set session until after successful init
 	go func() {
-		_, err := a.Client.Session.Init(ctx, a.Session.ID, opencode.SessionInitParams{
+		// Create goroutine context with timeout
+		initCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
+		defer cancel()
+		
+		_, err := a.Client.Session.Init(initCtx, session.ID, opencode.SessionInitParams{
 			ProviderID: opencode.F(a.Provider.ID),
 			ModelID:    opencode.F(a.Model.ID),
 		})
 		if err != nil {
 			slog.Error("Failed to initialize project", "error", err)
-			// status.Error(err.Error())
+			return
 		}
+		// Set session only after successful init
+		a.Session = session
 	}()
+	
+	// Return session selected message immediately for UI update
+	cmds = append(cmds, util.CmdHandler(SessionSelectedMsg(session)))
 
 	return tea.Batch(cmds...)
 }
@@ -366,7 +383,7 @@ func (a *App) SendChatMessage(ctx context.Context, text string, attachments []At
 	}
 
 	cmds = append(cmds, func() tea.Msg {
-		// Process images first to know which ones loaded successfully
+		// Process images first to know which ones loaded successfuly
 		loadedCount := 0
 		loadedPaths := []string{}
 		var imageParts []opencode.MessagePartUnionParam
@@ -502,6 +519,9 @@ func (a *App) ListProviders(ctx context.Context) ([]opencode.Provider, error) {
 
 // PushSession adds a session to the navigation stack
 func (a *App) PushSession(sessionID string) {
+	a.sessionMutex.Lock()
+	defer a.sessionMutex.Unlock()
+	
 	if a.SessionStack == nil {
 		a.SessionStack = []string{}
 	}
@@ -514,6 +534,9 @@ func (a *App) PushSession(sessionID string) {
 
 // PopSession removes and returns the last session from the stack
 func (a *App) PopSession() string {
+	a.sessionMutex.Lock()
+	defer a.sessionMutex.Unlock()
+	
 	if len(a.SessionStack) == 0 {
 		return ""
 	}
@@ -577,5 +600,31 @@ func (a *App) SwitchToSession(ctx context.Context, sessionID string) tea.Cmd {
 			Session:   session,
 			Messages:  messages,
 		}
+	}
+}
+
+// Shutdown gracefully shuts down the app and cleans up resources
+func (a *App) Shutdown() {
+	if a.shutdownCancel != nil {
+		a.shutdownCancel()
+	}
+	
+	// Wait for all goroutines with timeout
+	done := make(chan struct{})
+	go func() {
+		a.shutdownWg.Wait()
+		close(done)
+	}()
+	
+	select {
+	case <-done:
+		// All goroutines finished
+	case <-time.After(5 * time.Second):
+		slog.Warn("Shutdown timeout - some goroutines may not have finished")
+	}
+	
+	// Disconnect task client if exists
+	if a.TaskClient != nil {
+		a.TaskClient.Disconnect()
 	}
 }

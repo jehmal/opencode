@@ -784,7 +784,7 @@ Observation: "Connection refused"
 
 Thought: Database is down, need to restart
 Action: systemctl restart postgresql
-Observation: "Service started successfully"
+Observation: "Service started successfuly"
 ```
 
 #### Performance Characteristics

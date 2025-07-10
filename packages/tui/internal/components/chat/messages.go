@@ -114,6 +114,10 @@ func (m *messagesComponent) renderView() {
 	width := layout.Current.Container.Width
 
 	sb := strings.Builder{}
+	// Add nil check for Messages
+	if m.app.Messages == nil {
+		m.app.Messages = []opencode.Message{}
+	}
 	util.WriteStringsPar(&sb, m.app.Messages, func(message opencode.Message) string {
 		var content string
 		var cached bool

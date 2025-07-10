@@ -128,7 +128,7 @@ Dependencies: Testing framework, mocking utilities
 
 1. subsession.go compiles without errors
 2. WebSocket events fire when tasks execute
-3. Ctrl+B successfully returns to parent session
+3. Ctrl+B successfuly returns to parent session
 4. All tests pass with >90% coverage
 5. Tool filtering verified working in tests
 6. MCP tools confirmed always available

@@ -123,7 +123,7 @@ If you don't see sub-sessions:
 
 1. Ensure you're in the correct parent session
 2. The fallback will show ALL sub-sessions if none found for current
-3. Check that the task tool completed successfully
+3. Check that the task tool completed successfuly
 
 ### SDK Limitations
 

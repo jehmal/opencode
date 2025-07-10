@@ -222,7 +222,7 @@ Search Terms: multiple react versions, npm dedupe, peer deps`
 Track which memories are most helpful:
 
 ```typescript
-// After using a memory successfully
+// After using a memory successfuly
 const feedbackMemory = `MEMORY FEEDBACK:
 Used Memory: ${memoryId}
 Situation: ${currentProblem}

@@ -90,7 +90,7 @@ jq . [path-from-above]
 [TASK] Created sub-session: ses_yyy with parentID: ses_xxx
 [SUB-SESSION DEBUG] Creating sub-session: { ... }
 [SUB-SESSION DEBUG] Writing to: session/sub-sessions/ses_yyy
-[SUB-SESSION DEBUG] Sub-session created successfully
+[SUB-SESSION DEBUG] Sub-session created successfuly
 ```
 
 ### File System (Expected)

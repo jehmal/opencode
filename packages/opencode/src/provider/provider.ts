@@ -5,6 +5,7 @@ import { mergeDeep, sortBy } from "remeda"
 import { NoSuchModelError, type LanguageModel, type Provider as SDK } from "ai"
 import { Log } from "../util/log"
 import { BunProc } from "../bun"
+import { ProviderModule, ProviderError } from "../types/provider-types"
 import { BashTool } from "../tool/bash"
 import { EditTool } from "../tool/edit"
 import { WebFetchTool } from "../tool/webfetch"
@@ -379,8 +380,15 @@ export namespace Provider {
       const existing = s.sdk.get(provider.id)
       if (existing) return existing
       const pkg = provider.npm ?? provider.id
-      const mod = await import(await BunProc.install(pkg, "latest"))
-      const fn = mod[Object.keys(mod).find((key) => key.startsWith("create"))!]
+      const mod = await import(await BunProc.install(pkg, "latest")) as ProviderModule
+      const createFnKey = Object.keys(mod).find((key) => key.startsWith("create"))
+      if (!createFnKey) {
+        throw new Error(`No create function found in provider module ${pkg}`)
+      }
+      const fn = mod[createFnKey]
+      if (typeof fn !== 'function') {
+        throw new Error(`Invalid create function in provider module ${pkg}`)
+      }
       const loaded = fn(s.providers[provider.id]?.options)
       s.sdk.set(provider.id, loaded)
       return loaded as SDK

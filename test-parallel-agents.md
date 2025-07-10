@@ -37,7 +37,7 @@ This should trigger the automatic debug agent.
 ```
 Create two parallel agents:
 1. Read-only agent: Try to create a file (should fail)
-2. All-tools agent: Create a file successfully
+2. All-tools agent: Create a file successfuly
 ```
 
 ## Test 5: MCP and Vision Tools
