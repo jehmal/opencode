@@ -29,6 +29,9 @@ export const TuiCommand = cmd({
         return
       }
       const result = await bootstrap({ cwd }, async (app) => {
+        // Debug: Log the working directory being passed to the TUI
+        console.error(`[DGMO Debug] Working directory passed to TUI: ${cwd}`)
+        console.error(`[DGMO Debug] App info cwd: ${app.path.cwd}`)
         const providers = await Provider.list()
         if (Object.keys(providers).length === 0) {
           return "needs_provider"
@@ -52,6 +55,7 @@ export const TuiCommand = cmd({
         }
         let cmd: string[]
         let spawnCwd = process.cwd() // Store the current working directory after chdir
+        console.error(`[DGMO Debug] Spawn working directory: ${spawnCwd}`)
         let goCmdDir: string | undefined
 
         // First, check if we have embedded files (production build)
@@ -106,6 +110,9 @@ export const TuiCommand = cmd({
             OPENCODE_SERVER: `http://${server.hostname}:${server.port}`, // Backwards compatibility
             DGMO_APP_INFO: JSON.stringify(app),
             OPENCODE_APP_INFO: JSON.stringify(app), // Backwards compatibility
+            // Explicitly pass the working directory to the TUI
+            DGMO_WORKING_DIR: spawnCwd,
+            OPENCODE_WORKING_DIR: spawnCwd, // Backwards compatibility
             // If using go run, we need to tell Go where to find the source
             ...(goCmdDir ? { GOWORK: "off", PWD: goCmdDir } : {}),
           },
