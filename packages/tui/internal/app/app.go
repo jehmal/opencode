@@ -440,11 +440,36 @@ func (a *App) SendChatMessage(ctx context.Context, text string, attachments []At
 			}
 		}
 
-		_, err := a.Client.Session.Chat(ctx, a.Session.ID, opencode.SessionChatParams{
-			Parts:      opencode.F(parts),
-			ProviderID: opencode.F(a.Provider.ID),
-			ModelID:    opencode.F(a.Model.ID),
-		})
+		// Try to send the message with retries for busy errors
+		var err error
+		maxRetries := 3
+		retryDelay := 500 * time.Millisecond
+		
+		for i := 0; i < maxRetries; i++ {
+			_, err = a.Client.Session.Chat(ctx, a.Session.ID, opencode.SessionChatParams{
+				Parts:      opencode.F(parts),
+				ProviderID: opencode.F(a.Provider.ID),
+				ModelID:    opencode.F(a.Model.ID),
+			})
+			
+			if err == nil {
+				break // Success
+			}
+			
+			// Check if it's a busy error
+			if strings.Contains(err.Error(), "is busy") {
+				if i < maxRetries-1 {
+					slog.Info("Session is busy, retrying...", "attempt", i+1, "maxRetries", maxRetries)
+					time.Sleep(retryDelay)
+					retryDelay *= 2 // Exponential backoff
+					continue
+				}
+			}
+			
+			// For non-busy errors or final retry, fail immediately
+			break
+		}
+		
 		if err != nil {
 			errormsg := fmt.Sprintf("failed to send message: %v", err)
 			slog.Error(errormsg)

@@ -527,9 +527,11 @@ func (a appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						toast.WithDuration(2*time.Second),
 					))
 					
-					// Send the queued message with a small delay to ensure the UI updates
+					// Send the queued message with a delay to ensure backend has cleared busy state
+					// The backend clears busy state after the entire chat() function completes,
+					// which happens slightly after Time.Completed is set
 					// Convert SendMsg to QueuedSendMsg to bypass busy check
-					cmds = append(cmds, tea.Tick(100*time.Millisecond, func(t time.Time) tea.Msg {
+					cmds = append(cmds, tea.Tick(500*time.Millisecond, func(t time.Time) tea.Msg {
 						return app.QueuedSendMsg{
 							Text:        nextMsg.Text,
 							Attachments: nextMsg.Attachments,
