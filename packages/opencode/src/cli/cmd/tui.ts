@@ -51,8 +51,9 @@ export const TuiCommand = cmd({
           }
         }
         let cmd: string[]
-        let cwd = process.cwd()
-        
+        let spawnCwd = process.cwd() // Store the current working directory after chdir
+        let goCmdDir: string | undefined
+
         // First, check if we have embedded files (production build)
         if (Bun.embeddedFiles.length > 0) {
           const blob = Bun.embeddedFiles[0] as File
@@ -74,7 +75,7 @@ export const TuiCommand = cmd({
           )
           const binaryName = process.platform === "win32" ? "dgmo.exe" : "dgmo"
           const compiledBinary = path.join(tuiDir, binaryName)
-          
+
           try {
             await fs.access(compiledBinary, fs.constants.X_OK)
             // Binary exists and is executable
@@ -83,16 +84,16 @@ export const TuiCommand = cmd({
             // Binary doesn't exist or isn't executable, fall back to go run
             const goPath =
               Bun.which("go", { PATH: process.env["PATH"] }) || "/usr/bin/go"
-            const goCmdDir = Bun.fileURLToPath(
+            goCmdDir = Bun.fileURLToPath(
               new URL("../../../../tui/cmd/dgmo", import.meta.url),
             )
-            cmd = [goPath, "run", "./main.go"]
-            cwd = goCmdDir
+            cmd = [goPath, "run", path.join(goCmdDir, "main.go")]
+            // Note: We'll handle the working directory in the spawn options
           }
         }
         const proc = Bun.spawn({
           cmd: [...cmd, ...process.argv.slice(2)],
-          cwd,
+          cwd: spawnCwd, // Always use the user's current working directory
           stdout:
             process.env["OPENCODE_ENV"] === "production" ? "ignore" : "inherit",
           stderr:
@@ -105,6 +106,8 @@ export const TuiCommand = cmd({
             OPENCODE_SERVER: `http://${server.hostname}:${server.port}`, // Backwards compatibility
             DGMO_APP_INFO: JSON.stringify(app),
             OPENCODE_APP_INFO: JSON.stringify(app), // Backwards compatibility
+            // If using go run, we need to tell Go where to find the source
+            ...(goCmdDir ? { GOWORK: "off", PWD: goCmdDir } : {}),
           },
           onExit: () => {
             stopServer()
