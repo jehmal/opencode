@@ -420,6 +420,16 @@ func (a appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		a.messages = u.(chat.MessagesComponent)
 		cmds = append(cmds, cmd2)
 		return a, tea.Batch(cmds...)
+	case app.QueuedSendMsg:
+		// This is a queued message that should bypass the busy check
+		// Send it directly without checking IsBusy()
+		cmd := a.app.SendChatMessage(context.Background(), msg.Text, msg.Attachments)
+		cmds = append(cmds, cmd)
+		// Pass the event to messages component to scroll to bottom
+		u, cmd2 := a.messages.Update(app.SendMsg{Text: msg.Text, Attachments: msg.Attachments})
+		a.messages = u.(chat.MessagesComponent)
+		cmds = append(cmds, cmd2)
+		return a, tea.Batch(cmds...)
 	case app.OptimisticMessageAddedMsg:
 		// Pass the event to messages component for immediate UI update
 		u, cmd := a.messages.Update(msg)
@@ -518,8 +528,12 @@ func (a appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					))
 					
 					// Send the queued message with a small delay to ensure the UI updates
+					// Convert SendMsg to QueuedSendMsg to bypass busy check
 					cmds = append(cmds, tea.Tick(100*time.Millisecond, func(t time.Time) tea.Msg {
-						return nextMsg
+						return app.QueuedSendMsg{
+							Text:        nextMsg.Text,
+							Attachments: nextMsg.Attachments,
+						}
 					}))
 				} else {
 					a.queueMutex.Unlock()

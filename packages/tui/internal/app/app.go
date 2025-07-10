@@ -67,6 +67,12 @@ type SendMsg struct {
 	Text        string
 	Attachments []Attachment
 }
+
+// QueuedSendMsg is a message that was queued and should bypass busy check
+type QueuedSendMsg struct {
+	Text        string
+	Attachments []Attachment
+}
 type CompletionDialogTriggeredMsg struct {
 	InitialValue string
 }
