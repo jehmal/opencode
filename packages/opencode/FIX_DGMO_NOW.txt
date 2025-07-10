@@ -1,0 +1,17 @@
+Run these commands to fix dgmo:
+
+1. Make the wrapper executable:
+   chmod +x /mnt/c/Users/jehma/Desktop/DGMSTT/opencode/packages/opencode/dgmo-wrapper-final.sh
+
+2. Remove old dgmo function and add new alias:
+   sed -i '/^dgmo()/,/^}/d' ~/.bashrc
+   echo 'alias dgmo="/mnt/c/Users/jehma/Desktop/DGMSTT/opencode/packages/opencode/dgmo-wrapper-final.sh"' >> ~/.bashrc
+
+3. Activate the changes:
+   source ~/.bashrc
+
+4. Test it:
+   cd /mnt/c/Users/jehma/Desktop/test
+   dgmo
+
+That's it! dgmo will now open in your current directory.

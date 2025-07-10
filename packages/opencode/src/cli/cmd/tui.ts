@@ -21,7 +21,12 @@ export const TuiCommand = cmd({
     }),
   handler: async (args) => {
     while (true) {
-      const cwd = args.project ? path.resolve(args.project) : process.cwd()
+      // Check for environment variable first, then fall back to process.cwd()
+      const envWorkingDir =
+        process.env.DGMO_WORKING_DIR || process.env.OPENCODE_WORKING_DIR
+      const cwd = args.project
+        ? path.resolve(args.project)
+        : envWorkingDir || process.cwd()
       try {
         process.chdir(cwd)
       } catch (e) {
