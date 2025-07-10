@@ -94,6 +94,7 @@ type appModel struct {
 	// Message queue for when assistant is busy
 	messageQueue      []app.SendMsg
 	queueMutex        sync.Mutex
+	lastProcessedCompletionID string // Track the last assistant message ID we processed queue for
 }
 
 func (a appModel) Init() tea.Cmd {
@@ -485,32 +486,44 @@ func (a appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		a.messages = u.(chat.MessagesComponent)
 		cmds = append(cmds, cmd)
 		
-		// Check if assistant is no longer busy and we have queued messages
-		if !a.app.IsBusy() {
-			a.queueMutex.Lock()
-			if len(a.messageQueue) > 0 {
-				// Get the first message from queue
-				nextMsg := a.messageQueue[0]
-				a.messageQueue = a.messageQueue[1:]
-				remainingCount := len(a.messageQueue)
-				a.queueMutex.Unlock()
+		// Check if this is an assistant message that just completed
+		if a.app.Session != nil && msg.Properties.Info.Metadata.SessionID == a.app.Session.ID {
+			updatedMsg := msg.Properties.Info
+			
+			// Check if this is an assistant message with a completion timestamp
+			if updatedMsg.Role == opencode.MessageRoleAssistant && 
+			   updatedMsg.Metadata.Time.Completed > 0 &&
+			   updatedMsg.ID != a.lastProcessedCompletionID {
 				
-				// Update editor queue count
-				a.editor.SetQueueCount(remainingCount)
+				// Mark this completion as processed
+				a.lastProcessedCompletionID = updatedMsg.ID
 				
-				// Show feedback about sending queued message
-				cmds = append(cmds, toast.NewInfoToast(
-					fmt.Sprintf("Sending queued message... (%d remaining)", remainingCount),
-					toast.WithTitle("📤 Processing Queue"),
-					toast.WithDuration(2*time.Second),
-				))
-				
-				// Send the queued message
-				cmds = append(cmds, func() tea.Msg {
-					return nextMsg
-				})
-			} else {
-				a.queueMutex.Unlock()
+				// Process the queue
+				a.queueMutex.Lock()
+				if len(a.messageQueue) > 0 {
+					// Get the first message from queue
+					nextMsg := a.messageQueue[0]
+					a.messageQueue = a.messageQueue[1:]
+					remainingCount := len(a.messageQueue)
+					a.queueMutex.Unlock()
+					
+					// Update editor queue count
+					a.editor.SetQueueCount(remainingCount)
+					
+					// Show feedback about sending queued message
+					cmds = append(cmds, toast.NewInfoToast(
+						fmt.Sprintf("Sending queued message... (%d remaining)", remainingCount),
+						toast.WithTitle("📤 Processing Queue"),
+						toast.WithDuration(2*time.Second),
+					))
+					
+					// Send the queued message with a small delay to ensure the UI updates
+					cmds = append(cmds, tea.Tick(100*time.Millisecond, func(t time.Time) tea.Msg {
+						return nextMsg
+					}))
+				} else {
+					a.queueMutex.Unlock()
+				}
 			}
 		}
 		
@@ -563,6 +576,9 @@ func (a appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		a.queueMutex.Unlock()
 		a.editor.SetQueueCount(0)
+		
+		// Reset completion tracking for new session
+		a.lastProcessedCompletionID = ""
 
 		// Update session type when selecting from dialog
 		if msg.ParentID != "" {
@@ -591,6 +607,9 @@ func (a appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		a.queueMutex.Unlock()
 		a.editor.SetQueueCount(0)
+		
+		// Reset completion tracking for new session
+		a.lastProcessedCompletionID = ""
 		
 		// Close any open modal
 		if a.modal != nil {
