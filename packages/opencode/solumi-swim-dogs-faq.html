@@ -1,0 +1,390 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>
+      Paws & Waves Initiative - Solumi Swim Gives Back | Dog Charity Australia
+    </title>
+    <meta
+      name="description"
+      content="Discover how Solumi Swim donates 5% of every bikini sale to Australian dog refuges. Shop swimwear that saves lives - both human and canine. Learn about our Paws & Waves initiative."
+    />
+    <meta
+      name="keywords"
+      content="solumi swim charity, dog refuge donations australia, ethical swimwear, bikinis that give back, australian dog charity, sustainable fashion, paws and waves, dog rescue swimwear"
+    />
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family: "Arial", sans-serif;
+        background: #fafafa;
+        color: #333;
+        line-height: 1.8;
+      }
+
+      .faq-hero {
+        background: linear-gradient(
+          135deg,
+          #e0f7fa 0%,
+          #fff5e6 50%,
+          #fce4ec 100%
+        );
+        padding: 100px 50px 60px;
+        text-align: center;
+        position: relative;
+        overflow: hidden;
+      }
+
+      .paw-pattern {
+        position: absolute;
+        width: 100%;
+        height: 100%;
+        opacity: 0.05;
+        background-image:
+          radial-gradient(circle at 20% 30%, #87ceeb 2px, transparent 2px),
+          radial-gradient(circle at 25% 25%, #87ceeb 1.5px, transparent 1.5px),
+          radial-gradient(circle at 15% 25%, #87ceeb 1.5px, transparent 1.5px),
+          radial-gradient(circle at 20% 20%, #87ceeb 3px, transparent 3px);
+        background-size: 100px 100px;
+        background-position:
+          0 0,
+          10px 10px,
+          -10px 10px,
+          0 20px;
+        animation: float 20s ease-in-out infinite;
+      }
+
+      @keyframes float {
+        0%,
+        100% {
+          transform: translateY(0) rotate(0deg);
+        }
+        50% {
+          transform: translateY(-20px) rotate(5deg);
+        }
+      }
+
+      h1 {
+        font-size: 56px;
+        font-weight: 100;
+        letter-spacing: 4px;
+        margin-bottom: 20px;
+        color: #333;
+        position: relative;
+        z-index: 1;
+      }
+
+      .subtitle {
+        font-size: 24px;
+        color: #666;
+        letter-spacing: 2px;
+        margin-bottom: 10px;
+        font-weight: 300;
+      }
+
+      .emoji-wave {
+        display: inline-block;
+        animation: wave 2s ease-in-out infinite;
+        font-size: 32px;
+        margin: 0 10px;
+      }
+
+      @keyframes wave {
+        0%,
+        100% {
+          transform: rotate(0deg);
+        }
+        25% {
+          transform: rotate(-20deg);
+        }
+        75% {
+          transform: rotate(20deg);
+        }
+      }
+
+      .content-section {
+        max-width: 900px;
+        margin: 80px auto;
+        padding: 0 50px;
+      }
+
+      .initiative-intro {
+        background: white;
+        padding: 60px;
+        border-radius: 20px;
+        box-shadow: 0 10px 40px rgba(0, 0, 0, 0.05);
+        margin-bottom: 60px;
+        position: relative;
+        overflow: hidden;
+      }
+
+      .initiative-intro::before {
+        content: "🐾";
+        position: absolute;
+        top: -20px;
+        right: -20px;
+        font-size: 120px;
+        opacity: 0.1;
+        transform: rotate(-15deg);
+      }
+
+      h2 {
+        font-size: 36px;
+        font-weight: 300;
+        letter-spacing: 2px;
+        margin-bottom: 30px;
+        color: #333;
+      }
+
+      .highlight {
+        background: linear-gradient(to right, #87ceeb, #fce4ec);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        font-weight: bold;
+      }
+
+      .copy-block {
+        font-size: 18px;
+        line-height: 1.8;
+        color: #555;
+        margin-bottom: 25px;
+      }
+
+      .faq-grid {
+        display: grid;
+        gap: 30px;
+        margin-top: 60px;
+      }
+
+      .faq-item {
+        background: white;
+        padding: 40px;
+        border-radius: 15px;
+        box-shadow: 0 5px 20px rgba(0, 0, 0, 0.05);
+        transition: all 0.3s ease;
+        border-left: 4px solid #87ceeb;
+      }
+
+      .faq-item:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+      }
+
+      .faq-question {
+        font-size: 22px;
+        font-weight: 500;
+        margin-bottom: 15px;
+        color: #333;
+      }
+
+      .faq-answer {
+        font-size: 16px;
+        color: #666;
+        line-height: 1.8;
+      }
+
+      .impact-stats {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 30px;
+        margin: 60px 0;
+        text-align: center;
+      }
+
+      .stat-card {
+        background: linear-gradient(135deg, #e0f7fa 0%, #fce4ec 100%);
+        padding: 30px;
+        border-radius: 15px;
+        transition: transform 0.3s ease;
+      }
+
+      .stat-card:hover {
+        transform: scale(1.05);
+      }
+
+      .stat-number {
+        font-size: 36px;
+        font-weight: bold;
+        color: #87ceeb;
+        margin-bottom: 10px;
+      }
+
+      .stat-label {
+        font-size: 14px;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        color: #666;
+      }
+
+      .cta-section {
+        text-align: center;
+        padding: 80px 50px;
+        background: linear-gradient(135deg, #fff5e6 0%, #e0f7fa 100%);
+        border-radius: 20px;
+        margin-top: 80px;
+      }
+
+      .cta-button {
+        display: inline-block;
+        padding: 20px 60px;
+        background: #333;
+        color: white;
+        text-decoration: none;
+        letter-spacing: 2px;
+        transition: all 0.3s ease;
+        border: 1px solid #333;
+        margin-top: 30px;
+        font-size: 16px;
+      }
+
+      .cta-button:hover {
+        background: transparent;
+        color: #333;
+        transform: translateY(-2px);
+      }
+
+      .dog-icon {
+        display: inline-block;
+        font-size: 24px;
+        margin: 0 5px;
+        animation: bounce 2s ease-in-out infinite;
+      }
+
+      @keyframes bounce {
+        0%,
+        100% {
+          transform: translateY(0);
+        }
+        50% {
+          transform: translateY(-10px);
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="faq-hero">
+      <div class="paw-pattern"></div>
+      <h1>PAWS & WAVES INITIATIVE</h1>
+      <p class="subtitle">Where Beach Fashion Meets Puppy Passion</p>
+      <span class="emoji-wave">🌊</span><span class="dog-icon">🐕</span
+      ><span class="emoji-wave">🌊</span>
+    </div>
+
+    <div class="content-section">
+      <div class="initiative-intro">
+        <h2>
+          Why <span class="highlight">Dogs & Bikinis</span> Make Perfect Sense
+        </h2>
+
+        <p class="copy-block">
+          At Solumi Swim, we believe the best beach days include sandy paws
+          alongside sandy toes. That's why we've pledged
+          <strong>5% of every single bikini sale</strong> to support dog refuges
+          across Australia. Our Paws & Waves initiative isn't just about looking
+          good in swimwear—it's about creating waves of change for our
+          four-legged friends who need it most. Every time you slip into your
+          Solumi bikini, you're not just embracing minimalist elegance; you're
+          wrapping yourself in the knowledge that you've helped provide food,
+          shelter, and medical care for rescue dogs waiting for their forever
+          homes. Because let's face it, dogs make everything better—even bikini
+          shopping.
+        </p>
+
+        <p class="copy-block">
+          Born from countless beach walks with our own rescue pups and inspired
+          by the unconditional love only dogs can give, our commitment runs
+          deeper than typical corporate charity. We partner exclusively with
+          <strong>no-kill shelters and refuges throughout Australia</strong>,
+          ensuring your contribution directly impacts dogs who might otherwise
+          face uncertain futures. From the sun-soaked shores of Bondi to the
+          pristine beaches of the Gold Coast, we're building a community of
+          beach-loving, dog-obsessed women who understand that true beauty
+          radiates from acts of kindness. Join the Solumi Swim pack—where
+          sustainable fashion meets tail-wagging compassion, and every purchase
+          writes another chapter in a rescue dog's success story.
+        </p>
+      </div>
+
+      <div class="impact-stats">
+        <div class="stat-card">
+          <div class="stat-number">5%</div>
+          <div class="stat-label">Of Every Sale</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-number">∞</div>
+          <div class="stat-label">Dogs Helped</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-number">100%</div>
+          <div class="stat-label">Transparent</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-number">🐾</div>
+          <div class="stat-label">Love Given</div>
+        </div>
+      </div>
+
+      <div class="faq-grid">
+        <div class="faq-item">
+          <h3 class="faq-question">
+            Which Australian dog refuges do you support?
+          </h3>
+          <p class="faq-answer">
+            We rotate our partnerships quarterly to spread the love, working
+            with certified no-kill shelters across NSW, QLD, VIC, and beyond.
+            Each quarter, we spotlight a different refuge on our social media,
+            sharing their stories and the pups you've helped save.
+          </p>
+        </div>
+
+        <div class="faq-item">
+          <h3 class="faq-question">How can I track where my donation goes?</h3>
+          <p class="faq-answer">
+            Transparency is key! We publish quarterly "Paws & Waves Reports" on
+            our website and Instagram, complete with photos, donation receipts,
+            and heartwarming adoption success stories. You'll see exactly how
+            your bikini purchase transformed a dog's life.
+          </p>
+        </div>
+
+        <div class="faq-item">
+          <h3 class="faq-question">
+            Can I nominate a dog refuge for partnership?
+          </h3>
+          <p class="faq-answer">
+            Absolutely! We love hearing from our community. Send us your
+            nomination through our contact form with details about the refuge.
+            If they align with our values and meet our criteria, they could be
+            our next quarterly partner.
+          </p>
+        </div>
+
+        <div class="faq-item">
+          <h3 class="faq-question">
+            Do you organize beach meetups with rescue dogs?
+          </h3>
+          <p class="faq-answer">
+            Yes! We host "Bikinis & Puppies" beach days in major coastal cities
+            where Solumi swimmers can meet adoptable dogs from our partner
+            refuges. It's the perfect blend of sun, surf, and potential
+            soulmates (the four-legged kind).
+          </p>
+        </div>
+      </div>
+
+      <div class="cta-section">
+        <h2>Ready to Make Waves for Wagging Tails?</h2>
+        <p>
+          Every Solumi Swim purchase = Happy, healthy rescue dogs finding homes
+        </p>
+        <a href="/shop" class="cta-button">SHOP WITH PURPOSE</a>
+      </div>
+    </div>
+  </body>
+</html>
