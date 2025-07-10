@@ -37,6 +37,7 @@ type EditorComponent interface {
 	Previous() (tea.Model, tea.Cmd)
 	Next() (tea.Model, tea.Cmd)
 	SetInterruptKeyInDebounce(inDebounce bool)
+	SetQueueCount(count int)
 }
 
 type editorComponent struct {
@@ -49,6 +50,7 @@ type editorComponent struct {
 	currentMessage         string
 	spinner                spinner.Model
 	interruptKeyInDebounce bool
+	queueCount             int
 }
 
 func (m *editorComponent) Init() tea.Cmd {
@@ -140,6 +142,13 @@ func (m *editorComponent) Content(width int, align lipgloss.Position) string {
 		} else {
 			hint = muted("working") + m.spinner.View() + muted("  ") + base(keyText) + muted(" interrupt")
 		}
+		// Show queue count if there are queued messages
+		if m.queueCount > 0 {
+			hint += muted("  |  ") + base(fmt.Sprintf("%d", m.queueCount)) + muted(" queued")
+		}
+	} else if m.queueCount > 0 {
+		// Show queue count even when not busy
+		hint += muted("  |  ") + base(fmt.Sprintf("%d", m.queueCount)) + muted(" queued")
 	}
 
 	model := ""
@@ -305,6 +314,10 @@ func (m *editorComponent) Next() (tea.Model, tea.Cmd) {
 
 func (m *editorComponent) SetInterruptKeyInDebounce(inDebounce bool) {
 	m.interruptKeyInDebounce = inDebounce
+}
+
+func (m *editorComponent) SetQueueCount(count int) {
+	m.queueCount = count
 }
 
 func (m *editorComponent) getInterruptKeyText() string {

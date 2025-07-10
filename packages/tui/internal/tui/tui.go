@@ -90,6 +90,10 @@ type appModel struct {
 	continuationPrompt            string                // Store the continuation prompt until task completes
 	pendingContinuationCompletion *app.TaskCompletedMsg // Store early-arriving continuation task completion
 	continuationMutex             sync.RWMutex          // Mutex for thread-safe access to continuation fields
+	
+	// Message queue for when assistant is busy
+	messageQueue      []app.SendMsg
+	queueMutex        sync.Mutex
 }
 
 func (a appModel) Init() tea.Cmd {
@@ -387,6 +391,27 @@ func (a appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return a, toast.NewErrorToast(msg.Error())
 	case app.SendMsg:
 		a.showCompletionDialog = false
+		
+		// Check if assistant is busy
+		if a.app.IsBusy() {
+			// Queue the message
+			a.queueMutex.Lock()
+			a.messageQueue = append(a.messageQueue, msg)
+			queueLength := len(a.messageQueue)
+			a.queueMutex.Unlock()
+			
+			// Update editor queue count
+			a.editor.SetQueueCount(queueLength)
+			
+			// Show feedback that message is queued
+			return a, toast.NewInfoToast(
+				fmt.Sprintf("Message queued (%d in queue). Will send when assistant finishes.", queueLength),
+				toast.WithTitle("⏳ Queued"),
+				toast.WithDuration(3*time.Second),
+			)
+		}
+		
+		// Not busy, send immediately
 		cmd := a.app.SendChatMessage(context.Background(), msg.Text, msg.Attachments)
 		cmds = append(cmds, cmd)
 		// Pass the event to messages component to scroll to bottom
@@ -421,6 +446,7 @@ func (a appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		a.messages = u.(chat.MessagesComponent)
 		return a, cmd
 	case opencode.EventListResponseEventMessageUpdated:
+		var cmds []tea.Cmd
 		if a.app.Session != nil && msg.Properties.Info.Metadata.SessionID == a.app.Session.ID {
 			exists := false
 			optimisticReplaced := false
@@ -457,7 +483,38 @@ func (a appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// Pass the event to messages component for UI update
 		u, cmd := a.messages.Update(msg)
 		a.messages = u.(chat.MessagesComponent)
-		return a, cmd
+		cmds = append(cmds, cmd)
+		
+		// Check if assistant is no longer busy and we have queued messages
+		if !a.app.IsBusy() {
+			a.queueMutex.Lock()
+			if len(a.messageQueue) > 0 {
+				// Get the first message from queue
+				nextMsg := a.messageQueue[0]
+				a.messageQueue = a.messageQueue[1:]
+				remainingCount := len(a.messageQueue)
+				a.queueMutex.Unlock()
+				
+				// Update editor queue count
+				a.editor.SetQueueCount(remainingCount)
+				
+				// Show feedback about sending queued message
+				cmds = append(cmds, toast.NewInfoToast(
+					fmt.Sprintf("Sending queued message... (%d remaining)", remainingCount),
+					toast.WithTitle("📤 Processing Queue"),
+					toast.WithDuration(2*time.Second),
+				))
+				
+				// Send the queued message
+				cmds = append(cmds, func() tea.Msg {
+					return nextMsg
+				})
+			} else {
+				a.queueMutex.Unlock()
+			}
+		}
+		
+		return a, tea.Batch(cmds...)
 	case opencode.EventListResponseEventSessionError:
 		switch err := msg.Properties.Error.AsUnion().(type) {
 		case nil:
@@ -498,6 +555,15 @@ func (a appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		a.app.Session = msg
 		a.app.Messages = messages
 
+		// Clear message queue when switching sessions
+		a.queueMutex.Lock()
+		if len(a.messageQueue) > 0 {
+			slog.Info("Clearing message queue due to session switch", "queueSize", len(a.messageQueue))
+			a.messageQueue = nil
+		}
+		a.queueMutex.Unlock()
+		a.editor.SetQueueCount(0)
+
 		// Update session type when selecting from dialog
 		if msg.ParentID != "" {
 			a.app.CurrentSessionType = "sub"
@@ -516,6 +582,16 @@ func (a appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// Handle session switching from navigation
 		a.app.Session = msg.Session
 		a.app.Messages = msg.Messages
+		
+		// Clear message queue when switching sessions
+		a.queueMutex.Lock()
+		if len(a.messageQueue) > 0 {
+			slog.Info("Clearing message queue due to session switch", "queueSize", len(a.messageQueue))
+			a.messageQueue = nil
+		}
+		a.queueMutex.Unlock()
+		a.editor.SetQueueCount(0)
+		
 		// Close any open modal
 		if a.modal != nil {
 			cmd := a.modal.Close()
@@ -1480,6 +1556,13 @@ func NewModel(app *app.App) tea.Model {
 	}
 
 	return model
+}
+
+// getQueueCount returns the number of messages in the queue
+func (a *appModel) getQueueCount() int {
+	a.queueMutex.Lock()
+	defer a.queueMutex.Unlock()
+	return len(a.messageQueue)
 }
 
 // navigateToSibling navigates to the next or previous sibling sub-session
