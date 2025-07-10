@@ -1,6 +1,7 @@
 package chat
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/charmbracelet/bubbles/v2/viewport"
@@ -101,6 +102,38 @@ func (m *messagesComponent) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			util.CmdHandler(renderFinishedMsg{}),
 			func() tea.Msg { return nil }, // Force re-render
 		)
+	default:
+		// Handle any other SSE events that might be message-related
+		// Use reflection to catch all message event types
+		eventType := fmt.Sprintf("%T", msg)
+		eventHandled := false
+		
+		// Check if this is an opencode event containing "Message"
+		if strings.Contains(eventType, "opencode.EventListResponseEvent") && strings.Contains(eventType, "Message") {
+			eventHandled = true
+		}
+		
+		// Also check TypeName method if available
+		if !eventHandled {
+			if evt, ok := msg.(interface{ TypeName() string }); ok {
+				typeName := evt.TypeName()
+				if strings.Contains(typeName, "Message") {
+					eventHandled = true
+				}
+			}
+		}
+		
+		if eventHandled {
+			// Treat any message-related event as requiring a re-render
+			m.renderView()
+			if m.tail {
+				m.viewport.GotoBottom()
+			}
+			return m, tea.Batch(
+				util.CmdHandler(renderFinishedMsg{}),
+				func() tea.Msg { return nil }, // Force re-render
+			)
+		}
 	}
 
 	viewport, cmd := m.viewport.Update(msg)

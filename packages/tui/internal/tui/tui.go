@@ -898,6 +898,49 @@ func (a appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				a.continuationMutex.Unlock()
 			}
 		}
+	default:
+		// Handle any other SSE events that come through
+		// Use reflection to handle unknown event types dynamically
+		handled := false
+		
+		// First, check if this looks like an opencode event
+		eventType := fmt.Sprintf("%T", msg)
+		if strings.Contains(eventType, "opencode.EventListResponseEvent") {
+			slog.Debug("Received opencode event", "type", eventType)
+			
+			// Handle message-related events
+			if strings.Contains(eventType, "Message") {
+				// For any message event, pass it to the components and force re-render
+				slog.Info("Processing message event", "type", eventType)
+				
+				// Pass to messages component for rendering
+				u, cmd := a.messages.Update(msg)
+				a.messages = u.(chat.MessagesComponent)
+				cmds = append(cmds, cmd)
+				
+				// Force complete UI re-render to ensure updates are visible
+				cmds = append(cmds, func() tea.Msg { return nil })
+				handled = true
+			}
+		}
+		
+		// Also try the TypeName method if available
+		if !handled {
+			if evt, ok := msg.(interface{ TypeName() string }); ok {
+				eventTypeName := evt.TypeName()
+				if strings.Contains(eventTypeName, "Message") {
+					slog.Debug("Processing message event via TypeName", "type", eventTypeName)
+					
+					// Pass to messages component
+					u, cmd := a.messages.Update(msg)
+					a.messages = u.(chat.MessagesComponent)
+					cmds = append(cmds, cmd)
+					
+					// Force UI re-render
+					cmds = append(cmds, func() tea.Msg { return nil })
+				}
+			}
+		}
 	}
 
 	// update status bar

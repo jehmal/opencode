@@ -178,7 +178,7 @@ func main() {
 
 	// Attempt connection in background to avoid blocking startup
 	go func() {
-		defer cancel() // Ensure context is cancelled on exit
+		// Remove the defer cancel() that was here - it was canceling the main context prematurely
 		slog.Info("TUI attempting to connect to WebSocket server...")
 		if err := taskClient.Connect(); err != nil {
 			slog.Error("TUI failed to connect to task event server", "error", err)
@@ -198,6 +198,15 @@ func main() {
 		stream := httpClient.Event.ListStreaming(ctx)
 		for stream.Next() {
 			evt := stream.Current().AsUnion()
+			// Debug log SSE events to understand what's coming through
+			if evt != nil {
+				if evtTyped, ok := evt.(interface{ TypeName() string }); ok {
+					eventType := evtTyped.TypeName()
+					if strings.Contains(eventType, "Message") {
+						slog.Debug("SSE Message Event", "type", eventType)
+					}
+				}
+			}
 			program.Send(evt)
 		}
 		if err := stream.Err(); err != nil {

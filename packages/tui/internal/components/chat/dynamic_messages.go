@@ -107,7 +107,9 @@ func (dm *dynamicMessagesComponent) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case opencode.EventListResponseEventMessageUpdated,
 		app.OptimisticMessageAddedMsg,
 		app.SessionSelectedMsg,
-		app.SessionSwitchedMsg:
+		app.SessionSwitchedMsg,
+		// Add handling for any message event that implements TypeName
+		interface{ TypeName() string }:
 
 		if dm.enabled {
 			// Recalculate size when content changes
