@@ -389,6 +389,16 @@ func (a appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		a.showCompletionDialog = false
 		cmd := a.app.SendChatMessage(context.Background(), msg.Text, msg.Attachments)
 		cmds = append(cmds, cmd)
+		// Pass the event to messages component to scroll to bottom
+		u, cmd2 := a.messages.Update(msg)
+		a.messages = u.(chat.MessagesComponent)
+		cmds = append(cmds, cmd2)
+		return a, tea.Batch(cmds...)
+	case app.OptimisticMessageAddedMsg:
+		// Pass the event to messages component for immediate UI update
+		u, cmd := a.messages.Update(msg)
+		a.messages = u.(chat.MessagesComponent)
+		return a, cmd
 	case dialog.CompletionDialogCloseMsg:
 		a.showCompletionDialog = false
 	case opencode.EventListResponseEventInstallationUpdated:
@@ -406,6 +416,10 @@ func (a appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if a.app.Session != nil && msg.Properties.Info.ID == a.app.Session.ID {
 			a.app.Session = &msg.Properties.Info
 		}
+		// Pass the event to messages component for UI update
+		u, cmd := a.messages.Update(msg)
+		a.messages = u.(chat.MessagesComponent)
+		return a, cmd
 	case opencode.EventListResponseEventMessageUpdated:
 		if a.app.Session != nil && msg.Properties.Info.Metadata.SessionID == a.app.Session.ID {
 			exists := false
@@ -440,6 +454,10 @@ func (a appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				a.app.Messages = append(a.app.Messages, msg.Properties.Info)
 			}
 		}
+		// Pass the event to messages component for UI update
+		u, cmd := a.messages.Update(msg)
+		a.messages = u.(chat.MessagesComponent)
+		return a, cmd
 	case opencode.EventListResponseEventSessionError:
 		switch err := msg.Properties.Error.AsUnion().(type) {
 		case nil:
@@ -487,6 +505,11 @@ func (a appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		} else {
 			a.app.CurrentSessionType = "main"
 		}
+		
+		// Pass the event to messages component for UI update
+		u, cmd := a.messages.Update(msg)
+		a.messages = u.(chat.MessagesComponent)
+		return a, cmd
 
 	case app.SessionSwitchedMsg:
 
@@ -501,7 +524,11 @@ func (a appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		// Show success toast
 		cmds = append(cmds, toast.NewSuccessToast(fmt.Sprintf("Switched to session: %s", msg.Session.Title)))
-		// Messages will be updated automatically via a.app.Messages
+		// Pass the event to messages component for UI update
+		u, cmd := a.messages.Update(msg)
+		a.messages = u.(chat.MessagesComponent)
+		cmds = append(cmds, cmd)
+		return a, tea.Batch(cmds...)
 	case app.ModelSelectedMsg:
 		a.app.Provider = &msg.Provider
 		a.app.Model = &msg.Model
