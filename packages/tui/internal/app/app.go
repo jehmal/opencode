@@ -442,8 +442,8 @@ func (a *App) SendChatMessage(ctx context.Context, text string, attachments []At
 
 		// Try to send the message with retries for busy errors
 		var err error
-		maxRetries := 3
-		retryDelay := 500 * time.Millisecond
+		maxRetries := 5  // Increased from 3
+		retryDelay := 1000 * time.Millisecond  // Increased from 500ms
 		
 		for i := 0; i < maxRetries; i++ {
 			_, err = a.Client.Session.Chat(ctx, a.Session.ID, opencode.SessionChatParams{
@@ -459,9 +459,12 @@ func (a *App) SendChatMessage(ctx context.Context, text string, attachments []At
 			// Check if it's a busy error
 			if strings.Contains(err.Error(), "is busy") {
 				if i < maxRetries-1 {
-					slog.Info("Session is busy, retrying...", "attempt", i+1, "maxRetries", maxRetries)
+					slog.Info("Session is busy, retrying...", 
+						"attempt", i+1, 
+						"maxRetries", maxRetries,
+						"nextDelay", retryDelay)
 					time.Sleep(retryDelay)
-					retryDelay *= 2 // Exponential backoff
+					retryDelay = time.Duration(float64(retryDelay) * 1.5) // Gentler exponential backoff
 					continue
 				}
 			}

@@ -92,9 +92,56 @@ type appModel struct {
 	continuationMutex             sync.RWMutex          // Mutex for thread-safe access to continuation fields
 	
 	// Message queue for when assistant is busy
-	messageQueue      []app.SendMsg
-	queueMutex        sync.Mutex
-	lastProcessedCompletionID string // Track the last assistant message ID we processed queue for
+	messageQueue              []app.SendMsg
+	queueMutex                sync.Mutex
+	lastProcessedCompletionID string    // Track the last assistant message ID we processed queue for
+	lastMessageUpdateTime     time.Time // Track when we last received ANY message update event
+	sessionActivityMutex      sync.RWMutex
+}
+
+// createQueueProcessCommand creates a command that waits for session activity to stop before sending a queued message
+func (a appModel) createQueueProcessCommand(msg app.SendMsg) tea.Cmd {
+	return func() tea.Msg {
+		// Wait for a quiet period where no message updates are received
+		// This indicates the backend has finished processing and cleared its busy state
+		const quietPeriod = 800 * time.Millisecond
+		const maxWaitTime = 5 * time.Second
+		const checkInterval = 100 * time.Millisecond
+		
+		startTime := time.Now()
+		
+		for {
+			// Check how long since last message update
+			a.sessionActivityMutex.RLock()
+			timeSinceLastUpdate := time.Since(a.lastMessageUpdateTime)
+			a.sessionActivityMutex.RUnlock()
+			
+			// If we've had a quiet period, session is likely idle
+			if timeSinceLastUpdate >= quietPeriod {
+				slog.Debug("Session quiet period reached, processing queued message", 
+					"quietTime", timeSinceLastUpdate,
+					"threshold", quietPeriod)
+				break
+			}
+			
+			// Safety check: don't wait forever
+			if time.Since(startTime) >= maxWaitTime {
+				slog.Warn("Max wait time reached, processing queued message anyway",
+					"waitTime", time.Since(startTime),
+					"lastUpdateAgo", timeSinceLastUpdate)
+				break
+			}
+			
+			// Sleep and check again
+			time.Sleep(checkInterval)
+		}
+		
+		// Return the queued message to be sent
+		return app.QueuedSendMsg{
+			Text:        msg.Text,
+			Attachments: msg.Attachments,
+		}
+	}
 }
 
 func (a appModel) Init() tea.Cmd {
@@ -458,6 +505,12 @@ func (a appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return a, cmd
 	case opencode.EventListResponseEventMessageUpdated:
 		var cmds []tea.Cmd
+		
+		// Track the last time we received any message update
+		a.sessionActivityMutex.Lock()
+		a.lastMessageUpdateTime = time.Now()
+		a.sessionActivityMutex.Unlock()
+		
 		if a.app.Session != nil && msg.Properties.Info.Metadata.SessionID == a.app.Session.ID {
 			exists := false
 			optimisticReplaced := false
@@ -522,21 +575,14 @@ func (a appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					
 					// Show feedback about sending queued message
 					cmds = append(cmds, toast.NewInfoToast(
-						fmt.Sprintf("Sending queued message... (%d remaining)", remainingCount),
-						toast.WithTitle("📤 Processing Queue"),
+						fmt.Sprintf("Waiting for session to be ready... (%d in queue)", remainingCount),
+						toast.WithTitle("⏳ Processing Queue"),
 						toast.WithDuration(2*time.Second),
 					))
 					
-					// Send the queued message with a delay to ensure backend has cleared busy state
-					// The backend clears busy state after the entire chat() function completes,
-					// which happens slightly after Time.Completed is set
-					// Convert SendMsg to QueuedSendMsg to bypass busy check
-					cmds = append(cmds, tea.Tick(500*time.Millisecond, func(t time.Time) tea.Msg {
-						return app.QueuedSendMsg{
-							Text:        nextMsg.Text,
-							Attachments: nextMsg.Attachments,
-						}
-					}))
+					// Instead of a fixed delay, use a dynamic approach that waits for session activity to stop
+					// This ensures we only send when the backend is truly idle
+					cmds = append(cmds, a.createQueueProcessCommand(nextMsg))
 				} else {
 					a.queueMutex.Unlock()
 				}
