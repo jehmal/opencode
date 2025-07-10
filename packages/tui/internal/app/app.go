@@ -277,7 +277,11 @@ func (a *App) InitializeProject(ctx context.Context) tea.Cmd {
 		return nil
 	}
 
-	// Don't set session until after successful init
+	// Set session immediately so message events can be processed
+	a.Session = session
+	cmds = append(cmds, util.CmdHandler(SessionSelectedMsg(session)))
+
+	// Initialize project in background
 	go func() {
 		// Create goroutine context with timeout
 		initCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
@@ -289,14 +293,9 @@ func (a *App) InitializeProject(ctx context.Context) tea.Cmd {
 		})
 		if err != nil {
 			slog.Error("Failed to initialize project", "error", err)
-			return
+			// status.Error(err.Error())
 		}
-		// Set session only after successful init
-		a.Session = session
 	}()
-	
-	// Return session selected message immediately for UI update
-	cmds = append(cmds, util.CmdHandler(SessionSelectedMsg(session)))
 
 	return tea.Batch(cmds...)
 }

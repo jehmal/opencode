@@ -60,7 +60,8 @@ func (m *messagesComponent) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.tail {
 			m.viewport.GotoBottom()
 		}
-		return m, nil
+		// Return a command to ensure UI updates
+		return m, util.CmdHandler(renderFinishedMsg{})
 	case dialog.ThemeSelectedMsg:
 		m.cache.Clear()
 		return m, m.Reload()
@@ -90,6 +91,8 @@ func (m *messagesComponent) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.tail {
 			m.viewport.GotoBottom()
 		}
+		// Return a command to ensure UI updates
+		return m, util.CmdHandler(renderFinishedMsg{})
 	}
 
 	viewport, cmd := m.viewport.Update(msg)

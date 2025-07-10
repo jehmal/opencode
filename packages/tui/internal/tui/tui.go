@@ -403,11 +403,11 @@ func (a appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return a, toast.NewSuccessToast("Session deleted successfully")
 	case opencode.EventListResponseEventSessionUpdated:
-		if msg.Properties.Info.ID == a.app.Session.ID {
+		if a.app.Session != nil && msg.Properties.Info.ID == a.app.Session.ID {
 			a.app.Session = &msg.Properties.Info
 		}
 	case opencode.EventListResponseEventMessageUpdated:
-		if msg.Properties.Info.Metadata.SessionID == a.app.Session.ID {
+		if a.app.Session != nil && msg.Properties.Info.Metadata.SessionID == a.app.Session.ID {
 			exists := false
 			optimisticReplaced := false
 
