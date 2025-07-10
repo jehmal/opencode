@@ -1,0 +1,449 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>SOLUMI SWIM - Minimalist Bikini Collection</title>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family: "Arial", sans-serif;
+        background: #fafafa;
+        color: #333;
+        line-height: 1.6;
+      }
+
+      /* Minimalist Navigation */
+      nav {
+        position: fixed;
+        width: 100%;
+        background: rgba(255, 255, 255, 0.95);
+        backdrop-filter: blur(10px);
+        z-index: 1000;
+        padding: 20px 50px;
+        box-shadow: 0 2px 20px rgba(0, 0, 0, 0.05);
+      }
+
+      .nav-container {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        max-width: 1400px;
+        margin: 0 auto;
+      }
+
+      .logo {
+        font-size: 24px;
+        letter-spacing: 4px;
+        font-weight: 300;
+      }
+
+      .nav-links {
+        display: flex;
+        gap: 40px;
+        list-style: none;
+      }
+
+      .nav-links a {
+        text-decoration: none;
+        color: #333;
+        font-size: 14px;
+        letter-spacing: 1px;
+        transition: all 0.3s ease;
+        position: relative;
+      }
+
+      .nav-links a:hover {
+        color: #87ceeb;
+      }
+
+      .nav-links a::after {
+        content: "";
+        position: absolute;
+        bottom: -5px;
+        left: 0;
+        width: 0;
+        height: 1px;
+        background: #87ceeb;
+        transition: width 0.3s ease;
+      }
+
+      .nav-links a:hover::after {
+        width: 100%;
+      }
+
+      /* Hero Section */
+      .hero {
+        height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        position: relative;
+        overflow: hidden;
+        background: linear-gradient(135deg, #f5f5f5 0%, #e0f7fa 100%);
+      }
+
+      .hero-content {
+        text-align: center;
+        z-index: 2;
+        animation: fadeInUp 1s ease;
+      }
+
+      @keyframes fadeInUp {
+        from {
+          opacity: 0;
+          transform: translateY(30px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+
+      .hero h1 {
+        font-size: 72px;
+        font-weight: 100;
+        letter-spacing: 8px;
+        margin-bottom: 20px;
+        color: #333;
+      }
+
+      .hero p {
+        font-size: 18px;
+        letter-spacing: 2px;
+        margin-bottom: 40px;
+        color: #666;
+      }
+
+      .cta-button {
+        display: inline-block;
+        padding: 15px 50px;
+        background: #333;
+        color: white;
+        text-decoration: none;
+        letter-spacing: 2px;
+        transition: all 0.3s ease;
+        border: 1px solid #333;
+      }
+
+      .cta-button:hover {
+        background: transparent;
+        color: #333;
+        transform: translateY(-2px);
+      }
+
+      /* Floating Elements */
+      .float-element {
+        position: absolute;
+        width: 300px;
+        height: 300px;
+        border-radius: 50%;
+        background: rgba(135, 206, 235, 0.1);
+        animation: float 6s ease-in-out infinite;
+      }
+
+      .float-element:nth-child(2) {
+        top: -150px;
+        right: -150px;
+        animation-delay: 2s;
+      }
+
+      .float-element:nth-child(3) {
+        bottom: -150px;
+        left: -150px;
+        animation-delay: 4s;
+      }
+
+      @keyframes float {
+        0%,
+        100% {
+          transform: translateY(0) rotate(0deg);
+        }
+        50% {
+          transform: translateY(-20px) rotate(180deg);
+        }
+      }
+
+      /* Product Grid */
+      .products {
+        padding: 100px 50px;
+        max-width: 1400px;
+        margin: 0 auto;
+      }
+
+      .section-title {
+        text-align: center;
+        font-size: 48px;
+        font-weight: 100;
+        letter-spacing: 4px;
+        margin-bottom: 60px;
+      }
+
+      .product-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+        gap: 40px;
+      }
+
+      .product-card {
+        position: relative;
+        overflow: hidden;
+        background: white;
+        transition: all 0.3s ease;
+        cursor: pointer;
+      }
+
+      .product-card:hover {
+        transform: translateY(-10px);
+        box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+      }
+
+      .product-image {
+        width: 100%;
+        height: 500px;
+        background: linear-gradient(135deg, #e0f7fa 0%, #b2ebf2 100%);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 24px;
+        color: #666;
+        position: relative;
+        overflow: hidden;
+      }
+
+      .product-overlay {
+        position: absolute;
+        bottom: -100%;
+        left: 0;
+        right: 0;
+        background: rgba(255, 255, 255, 0.95);
+        padding: 20px;
+        transition: bottom 0.3s ease;
+      }
+
+      .product-card:hover .product-overlay {
+        bottom: 0;
+      }
+
+      .product-info {
+        padding: 30px;
+        text-align: center;
+      }
+
+      .product-name {
+        font-size: 20px;
+        letter-spacing: 2px;
+        margin-bottom: 10px;
+      }
+
+      .product-price {
+        font-size: 18px;
+        color: #87ceeb;
+        letter-spacing: 1px;
+      }
+
+      /* Trust Signals */
+      .trust-section {
+        background: #f5f5f5;
+        padding: 80px 50px;
+        text-align: center;
+      }
+
+      .trust-items {
+        display: flex;
+        justify-content: center;
+        gap: 80px;
+        margin-top: 40px;
+        flex-wrap: wrap;
+      }
+
+      .trust-item {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 15px;
+      }
+
+      .trust-icon {
+        width: 60px;
+        height: 60px;
+        background: #87ceeb;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 24px;
+      }
+
+      /* Newsletter */
+      .newsletter {
+        padding: 100px 50px;
+        text-align: center;
+        background: white;
+      }
+
+      .newsletter-form {
+        display: flex;
+        max-width: 500px;
+        margin: 40px auto;
+        box-shadow: 0 5px 20px rgba(0, 0, 0, 0.1);
+      }
+
+      .newsletter-form input {
+        flex: 1;
+        padding: 20px;
+        border: none;
+        font-size: 16px;
+        letter-spacing: 1px;
+      }
+
+      .newsletter-form button {
+        padding: 20px 40px;
+        background: #333;
+        color: white;
+        border: none;
+        letter-spacing: 2px;
+        cursor: pointer;
+        transition: background 0.3s ease;
+      }
+
+      .newsletter-form button:hover {
+        background: #87ceeb;
+      }
+
+      /* Urgency Banner */
+      .urgency-banner {
+        position: fixed;
+        bottom: 20px;
+        right: 20px;
+        background: #333;
+        color: white;
+        padding: 20px 30px;
+        border-radius: 5px;
+        animation: slideIn 0.5s ease;
+        z-index: 1000;
+      }
+
+      @keyframes slideIn {
+        from {
+          transform: translateX(100%);
+        }
+        to {
+          transform: translateX(0);
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <!-- Navigation -->
+    <nav>
+      <div class="nav-container">
+        <div class="logo">SOLUMI SWIM</div>
+        <ul class="nav-links">
+          <li><a href="#shop">SHOP</a></li>
+          <li><a href="#collections">COLLECTIONS</a></li>
+          <li><a href="#about">ABOUT</a></li>
+          <li><a href="#contact">CONTACT</a></li>
+          <li><a href="#cart">CART (0)</a></li>
+        </ul>
+      </div>
+    </nav>
+
+    <!-- Hero Section -->
+    <section class="hero">
+      <div class="float-element"></div>
+      <div class="float-element"></div>
+      <div class="hero-content">
+        <h1>SOLUMI SWIM</h1>
+        <p>Illuminated Elegance for the Modern Woman</p>
+        <a href="#shop" class="cta-button">EXPLORE COLLECTION</a>
+      </div>
+    </section>
+
+    <!-- Products -->
+    <section class="products" id="shop">
+      <h2 class="section-title">NEW ARRIVALS</h2>
+      <div class="product-grid">
+        <div class="product-card">
+          <div class="product-image">
+            [Minimalist Bikini Image]
+            <div class="product-overlay">
+              <p>Quick Add to Cart</p>
+              <p>Sizes: XS S M L XL</p>
+            </div>
+          </div>
+          <div class="product-info">
+            <h3 class="product-name">DAWN LIGHT</h3>
+            <p class="product-price">$89</p>
+          </div>
+        </div>
+        <div class="product-card">
+          <div class="product-image">
+            [Minimalist Bikini Image]
+            <div class="product-overlay">
+              <p>Quick Add to Cart</p>
+              <p>Sizes: XS S M L XL</p>
+            </div>
+          </div>
+          <div class="product-info">
+            <h3 class="product-name">SOLAR ESSENCE</h3>
+            <p class="product-price">$95</p>
+          </div>
+        </div>
+        <div class="product-card">
+          <div class="product-image">
+            [Minimalist Bikini Image]
+            <div class="product-overlay">
+              <p>Quick Add to Cart</p>
+              <p>Sizes: XS S M L XL</p>
+            </div>
+          </div>
+          <div class="product-info">
+            <h3 class="product-name">LUMINARY</h3>
+            <p class="product-price">$92</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Trust Signals -->
+    <section class="trust-section">
+      <h2 class="section-title">WHY CHOOSE US</h2>
+      <div class="trust-items">
+        <div class="trust-item">
+          <div class="trust-icon">🌊</div>
+          <h3>Sustainable Materials</h3>
+          <p>Ocean-friendly fabrics</p>
+        </div>
+        <div class="trust-item">
+          <div class="trust-icon">✨</div>
+          <h3>Premium Quality</h3>
+          <p>Handcrafted excellence</p>
+        </div>
+        <div class="trust-item">
+          <div class="trust-icon">🚚</div>
+          <h3>Free Shipping</h3>
+          <p>On orders over $100</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Newsletter -->
+    <section class="newsletter">
+      <h2 class="section-title">JOIN THE WAVE</h2>
+      <p>Get 15% off your first order</p>
+      <form class="newsletter-form">
+        <input type="email" placeholder="Enter your email" />
+        <button type="submit">SUBSCRIBE</button>
+      </form>
+    </section>
+
+    <!-- Urgency Banner -->
+    <div class="urgency-banner">🔥 Summer Sale: 20% OFF - Ends in 24 hours</div>
+  </body>
+</html>
